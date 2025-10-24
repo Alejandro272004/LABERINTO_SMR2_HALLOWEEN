@@ -196,10 +196,11 @@
             let nuevaFila = fila;
             let nuevaCol = col;
 
-            if (e.key === 'ArrowUp' === 'w') nuevaFila--;
-            else if (e.key === 'ArrowDown' === 's') nuevaFila++;
-            else if (e.key === 'ArrowLeft' === 'a') nuevaCol--;
-            else if (e.key === 'ArrowRight' === 'd') nuevaCol++;
+            if (e.key === 'ArrowUp' || e.key === 'w') nuevaFila--;
+            else if (e.key === 'ArrowDown' || e.key === 's') nuevaFila++;
+            else if (e.key === 'ArrowLeft' || e.key === 'a') nuevaCol--;
+            else if (e.key === 'ArrowRight' || e.key === 'd') nuevaCol++;
+
 
             if (
                 nuevaFila >= 0 && nuevaFila < mapa.length &&
