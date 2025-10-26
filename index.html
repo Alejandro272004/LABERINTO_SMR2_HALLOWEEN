@@ -123,32 +123,42 @@
         const mensaje = document.getElementById('mensaje');
         const btnReiniciar = document.getElementById('reiniciar');
 
-        // Generar laberinto aleatorio
+        // 🧩 Generar laberinto perfecto (solvable y aleatorio)
         function generarLaberinto(filas, columnas) {
+            // Inicializamos mapa lleno de paredes
             const mapa = Array.from({ length: filas }, () => Array(columnas).fill(1));
 
+            // Marcar celdas visitadas
+            const visitado = Array.from({ length: filas }, () => Array(columnas).fill(false));
+
             function esValido(f, c) {
-                return f > 0 && f < filas - 1 && c > 0 && c < columnas - 1;
+                return f > 0 && f < filas && c > 0 && c < columnas;
+            }
+
+            function shuffle(array) {
+                return array.sort(() => Math.random() - 0.5);
             }
 
             function crearCamino(f, c) {
-                const direcciones = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-                direcciones.sort(() => Math.random() - 0.5);
+                visitado[f][c] = true;
+                mapa[f][c] = 0; // camino
 
+                const direcciones = shuffle([[0, 1], [0, -1], [1, 0], [-1, 0]]);
                 for (let [df, dc] of direcciones) {
-                    let nf = f + df * 2;
-                    let nc = c + dc * 2;
-                    if (esValido(nf, nc) && mapa[nf][nc] === 1) {
+                    const nf = f + df * 2;
+                    const nc = c + dc * 2;
+                    if (esValido(nf, nc) && !visitado[nf][nc]) {
+                        // Romper la pared intermedia
                         mapa[f + df][c + dc] = 0;
-                        mapa[nf][nc] = 0;
                         crearCamino(nf, nc);
                     }
                 }
             }
 
-            mapa[0][0] = 0;
             crearCamino(0, 0);
-            mapa[filas - 1][columnas - 1] = 0; // meta accesible
+
+            // Asegurar meta accesible
+            mapa[filas - 1][columnas - 1] = 0;
 
             return mapa;
         }
@@ -168,7 +178,7 @@
 
         // Dibujar laberinto
         function dibujarLaberinto() {
-            laberinto.innerHTML = ""; // limpiar
+            laberinto.innerHTML = "";
             mapa.forEach(filaM => {
                 filaM.forEach(celda => {
                     const div = document.createElement('div');
@@ -241,6 +251,7 @@
         actualizarPosiciones();
         colocarMeta();
     </script>
+
 
 </body>
 
