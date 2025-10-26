@@ -118,80 +118,101 @@
 
     <script>
         // 🧩 Mapa más complejo (21x21)
-        const mapa = [
-            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
-            [1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1],
-            [1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1],
-            [1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1],
-            [1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1],
-            [1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1],
-            [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1],
-            [1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
-            [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1],
-            [1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1],
-            [1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 1],
-            [1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 1],
-            [1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1],
-            [1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1],
-            [1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1],
-            [1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1],
-            [1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1],
-            [1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1],
-            [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0]
-        ];
+        <script>
+            const FILAS = 21;
+            const COLUMNAS = 21;
+            const TAM = 34;
 
-        const TAM = 34; // tamaño de celda + espacio
-        const laberinto = document.getElementById('laberinto');
-        const mensaje = document.getElementById('mensaje');
-        const btnReiniciar = document.getElementById('reiniciar');
+            const laberinto = document.getElementById('laberinto');
+            const mensaje = document.getElementById('mensaje');
+            const btnReiniciar = document.getElementById('reiniciar');
 
+            // 🧩 Generar laberinto aleatorio simple
+            function generarLaberinto(filas, columnas) {
+        const mapa = Array.from({length: filas }, () => Array(columnas).fill(1));
+
+            function esValido(f, c) {
+            return f > 0 && f < filas - 1 && c > 0 && c < columnas - 1;
+        }
+
+            function crearCamino(f, c) {
+            const direcciones = [[0,1],[0,-1],[1,0],[-1,0]];
+            direcciones.sort(() => Math.random() - 0.5);
+
+            for (let [df, dc] of direcciones) {
+                let nf = f + df*2;
+            let nc = c + dc*2;
+            if (esValido(nf, nc) && mapa[nf][nc] === 1) {
+                mapa[f + df][c + dc] = 0;
+            mapa[nf][nc] = 0;
+            crearCamino(nf, nc);
+                }
+            }
+        }
+
+            mapa[0][0] = 0;
+            crearCamino(0, 0);
+
+            // Asegurar que la meta sea accesible
+            mapa[filas-1][columnas-1] = 0;
+
+            return mapa;
+    }
+
+            let mapa = generarLaberinto(FILAS, COLUMNAS);
+
+            // Dibujar el laberinto
+            function dibujarLaberinto() {
+                laberinto.innerHTML = "";
         mapa.forEach(fila => {
-            fila.forEach(celda => {
-                const div = document.createElement('div');
-                div.className = celda === 1 ? 'pared' : 'camino';
-                laberinto.appendChild(div);
-            });
+                fila.forEach(celda => {
+                    const div = document.createElement('div');
+                    div.className = celda === 1 ? 'pared' : 'camino';
+                    laberinto.appendChild(div);
+                });
         });
+            laberinto.appendChild(jugador);
+            laberinto.appendChild(meta);
+    }
 
-        const jugador = document.createElement('div');
-        jugador.id = 'jugador';
-        const meta = document.createElement('div');
-        meta.className = 'meta';
-        laberinto.appendChild(jugador);
-        laberinto.appendChild(meta);
+            const jugador = document.createElement('div');
+            jugador.id = 'jugador';
+            const meta = document.createElement('div');
+            meta.className = 'meta';
 
-        let fila = 0, col = 0;
-        const metaFila = 20, metaCol = 20;
+            let fila = 0, col = 0;
+            const metaFila = FILAS - 1, metaCol = COLUMNAS - 1;
 
-        function actualizarPosiciones() {
-            jugador.style.top = fila * (32 + 2) + 10 + "px";
+            function actualizarPosiciones() {
+                jugador.style.top = fila * (32 + 2) + 10 + "px";
             jugador.style.left = col * (32 + 2) + 10 + "px";
-        }
+    }
 
-        function colocarMeta() {
-            meta.style.top = metaFila * (32 + 2) + 10 + "px";
+            function colocarMeta() {
+                meta.style.top = metaFila * (32 + 2) + 10 + "px";
             meta.style.left = metaCol * (32 + 2) + 10 + "px";
-        }
+    }
 
-        function mostrarVictoria() {
-            mensaje.textContent = "👻 ¡Has escapado del laberinto embrujado! 🎃";
+            function mostrarVictoria() {
+                mensaje.textContent = "👻 ¡Has escapado del laberinto embrujado! 🎃";
             jugador.style.boxShadow = "0 0 30px 12px #00ff99";
-        }
+    }
 
-        function reiniciarJuego() {
-            fila = 0;
+            function reiniciarJuego() {
+                fila = 0;
             col = 0;
             mensaje.textContent = "";
             jugador.style.boxShadow = "0 0 25px 8px #ff8000";
+            mapa = generarLaberinto(FILAS, COLUMNAS);
+            dibujarLaberinto();
             actualizarPosiciones();
-        }
+            colocarMeta();
+    }
 
-        btnReiniciar.addEventListener('click', reiniciarJuego);
+            btnReiniciar.addEventListener('click', reiniciarJuego);
 
-        window.addEventListener('keydown', (e) => {
-            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
+    window.addEventListener('keydown', (e) => {
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
 
             let nuevaFila = fila;
             let nuevaCol = col;
@@ -201,22 +222,24 @@
             else if (e.key === 'ArrowLeft' || e.key === 'a') nuevaCol--;
             else if (e.key === 'ArrowRight' || e.key === 'd') nuevaCol++;
 
-
             if (
-                nuevaFila >= 0 && nuevaFila < mapa.length &&
-                nuevaCol >= 0 && nuevaCol < mapa[0].length &&
-                mapa[nuevaFila][nuevaCol] === 0
+            nuevaFila >= 0 && nuevaFila < mapa.length &&
+            nuevaCol >= 0 && nuevaCol < mapa[0].length &&
+            mapa[nuevaFila][nuevaCol] === 0
             ) {
                 fila = nuevaFila;
-                col = nuevaCol;
-                actualizarPosiciones();
+            col = nuevaCol;
+            actualizarPosiciones();
 
-                if (fila === metaFila && col === metaCol) mostrarVictoria();
-            }
-        });
+            if (fila === metaFila && col === metaCol) mostrarVictoria();
+        }
+    });
 
-        actualizarPosiciones();
-        colocarMeta();
+            dibujarLaberinto();
+            actualizarPosiciones();
+            colocarMeta();
+    </script>
+
     </script>
 </body>
 
