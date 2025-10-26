@@ -123,16 +123,14 @@
         const mensaje = document.getElementById('mensaje');
         const btnReiniciar = document.getElementById('reiniciar');
 
-        // 🧩 Generar laberinto perfecto (solvable y aleatorio)
+        // Generar laberinto perfecto
         function generarLaberinto(filas, columnas) {
             // Inicializamos mapa lleno de paredes
             const mapa = Array.from({ length: filas }, () => Array(columnas).fill(1));
 
-            // Marcar celdas visitadas
-            const visitado = Array.from({ length: filas }, () => Array(columnas).fill(false));
-
+            // Algoritmo Recursive Backtracking
             function esValido(f, c) {
-                return f > 0 && f < filas && c > 0 && c < columnas;
+                return f >= 0 && f < filas && c >= 0 && c < columnas;
             }
 
             function shuffle(array) {
@@ -140,15 +138,13 @@
             }
 
             function crearCamino(f, c) {
-                visitado[f][c] = true;
                 mapa[f][c] = 0; // camino
-
                 const direcciones = shuffle([[0, 1], [0, -1], [1, 0], [-1, 0]]);
                 for (let [df, dc] of direcciones) {
                     const nf = f + df * 2;
                     const nc = c + dc * 2;
-                    if (esValido(nf, nc) && !visitado[nf][nc]) {
-                        // Romper la pared intermedia
+                    if (esValido(nf, nc) && mapa[nf][nc] === 1) {
+                        // romper la pared intermedia
                         mapa[f + df][c + dc] = 0;
                         crearCamino(nf, nc);
                     }
@@ -157,7 +153,7 @@
 
             crearCamino(0, 0);
 
-            // Asegurar meta accesible
+            // Asegurar la meta accesible
             mapa[filas - 1][columnas - 1] = 0;
 
             return mapa;
@@ -251,6 +247,7 @@
         actualizarPosiciones();
         colocarMeta();
     </script>
+
 
 
 </body>
