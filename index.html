@@ -244,6 +244,11 @@
             mensaje.textContent = "👻 ¡Has escapado del laberinto embrujado! 🎃";
             jugador.style.boxShadow = "0 0 30px 12px #00ff99";
             clearInterval(intervaloTiempo);
+
+            // 🔗 Redirigir a otro archivo HTML después de un pequeño efecto
+            setTimeout(() => {
+                window.location.href = "final.html"; // <-- cambia este nombre si quieres
+            }, 2000);
         }
 
         function iniciarTemporizador() {
