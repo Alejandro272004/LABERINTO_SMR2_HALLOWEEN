@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laberinto Grande en HTML</title>
+    <style>
+        body {
+            background: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #laberinto {
+            display: grid;
+            grid-template-columns: repeat(20, 30px);
+            grid-template-rows: repeat(20, 30px);
+            gap: 2px;
+        }
+
+        .celda {
+            width: 30px;
+            height: 30px;
+            background: #0f172a;
+        }
+
+        .pared {
+            background: #0e162b;
+        }
+
+        .jugador {
+            background: #007bff;
+            border-radius: 5px;
+        }
+
+        .meta {
+            background: #28a745;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="laberinto"></div>
+
+    <script>
+        // 1 = pared, 0 = camino, 2 = meta
+        const mapa = [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1],
+            [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1],
+            [1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1],
+            [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+            [1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1],
+            [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1],
+            [1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1],
+            [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1],
+            [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+            [1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1],
+            [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1],
+            [1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1],
+            [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+            [1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 2, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ];
+
+        const laberinto = document.getElementById('laberinto');
+        let jugador = { x: 1, y: 1 };
+
+        function dibujarLaberinto() {
+            laberinto.innerHTML = '';
+            for (let y = 0; y < mapa.length; y++) {
+                for (let x = 0; x < mapa[y].length; x++) {
+                    const celda = document.createElement('div');
+                    celda.classList.add('celda');
+                    if (mapa[y][x] === 1) celda.classList.add('pared');
+                    if (mapa[y][x] === 2) celda.classList.add('meta');
+                    if (x === jugador.x && y === jugador.y) celda.classList.add('jugador');
+                    laberinto.appendChild(celda);
+                }
+            }
+        }
+
+        function moverJugador(dx, dy) {
+            const nuevoX = jugador.x + dx;
+            const nuevoY = jugador.y + dy;
+
+            // Si toca pared, reinicia
+            if (mapa[nuevoY][nuevoX] === 1) {
+                alert('💀 Tocaste una pared. ¡Vuelves al inicio!');
+                jugador.x = 1;
+                jugador.y = 1;
+                dibujarLaberinto();
+                return;
+            }
+
+            // Si es camino o meta, avanza
+            jugador.x = nuevoX;
+            jugador.y = nuevoY;
+
+            if (mapa[nuevoY][nuevoX] === 2) {
+                setTimeout(() => alert('🎉 ¡Has ganado el laberinto gigante!'), 100);
+            }
+
+            dibujarLaberinto();
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowUp') moverJugador(0, -1);
+            if (e.key === 'ArrowDown') moverJugador(0, 1);
+            if (e.key === 'ArrowLeft') moverJugador(-1, 0);
+            if (e.key === 'ArrowRight') moverJugador(1, 0);
+        });
+
+        dibujarLaberinto();
+    </script>
+</body>
+
+</html>
