@@ -4,15 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laberinto RPG</title>
+    <title>Laberinto RPG Visual con Nombres</title>
     <style>
         body {
             background: #0f172a;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
             font-family: sans-serif;
             color: white;
         }
@@ -53,6 +51,7 @@
         #stats {
             display: flex;
             gap: 20px;
+            margin-bottom: 10px;
         }
 
         .barra {
@@ -71,6 +70,25 @@
         .mana {
             background: #4da6ff;
             height: 100%;
+        }
+
+        #menuCombate {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        #menuCombate button {
+            width: 200px;
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #infoCombate {
+            margin-top: 10px;
+            min-height: 50px;
         }
     </style>
 </head>
@@ -91,10 +109,19 @@
 
     <div id="laberinto"></div>
 
+    <div id="infoCombate"></div>
+
+    <div id="menuCombate">
+        <button id="btnAtaque">Ataque Básico</button>
+        <button id="btnMagia">Magia (-10 Mana)</button>
+    </div>
+
     <script>
         const filas = 20;
         const columnas = 20;
         const laberinto = document.getElementById('laberinto');
+        const menuCombate = document.getElementById('menuCombate');
+        const infoCombate = document.getElementById('infoCombate');
 
         let mapa = [];
 
@@ -108,19 +135,15 @@
         };
 
         let monstruos = [];
+        let monstruoActual = null;
+        let enCombate = false;
 
-        // 🔹 Generar laberinto
+        const nombresMonstruos = ['Johan', 'Gabi', 'Santi', 'Dominic', 'Wasabi'];
+
         function generarLaberinto(filas, columnas) {
             const grid = Array.from({ length: filas }, () => Array(columnas).fill(1));
-
-            function esValido(f, c) {
-                return f > 0 && f < filas - 1 && c > 0 && c < columnas - 1;
-            }
-
-            function mezclar(arr) {
-                return arr.sort(() => Math.random() - 0.5);
-            }
-
+            function esValido(f, c) { return f > 0 && f < filas - 1 && c > 0 && c < columnas - 1; }
+            function mezclar(arr) { return arr.sort(() => Math.random() - 0.5); }
             function tallar(f, c) {
                 grid[f][c] = 0;
                 const dirs = mezclar([[1, 0], [-1, 0], [0, 1], [0, -1]]);
@@ -133,34 +156,30 @@
                     }
                 }
             }
-
             tallar(1, 1);
-
-            grid[filas - 3][columnas - 3] = 2; // meta
+            grid[filas - 3][columnas - 3] = 2;
             grid[filas - 3][columnas - 4] = 0;
             grid[filas - 4][columnas - 3] = 0;
-
             return grid;
         }
 
         mapa = generarLaberinto(filas, columnas);
 
-        // 🔹 Generar monstruos
-        function generarMonstruos(cantidad) {
+        function generarMonstruos() {
             let lista = [];
-            while (lista.length < cantidad) {
-                const x = Math.floor(Math.random() * columnas);
-                const y = Math.floor(Math.random() * filas);
-                if (mapa[y][x] === 0 && !(x === 1 && y === 1)) {
-                    lista.push({ x, y, vida: 50 + Math.floor(Math.random() * 30), ataque: 5 + Math.floor(Math.random() * 5) });
-                }
+            for (let i = 0; i < nombresMonstruos.length; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * columnas);
+                    y = Math.floor(Math.random() * filas);
+                } while (mapa[y][x] !== 0 || (x === 1 && y === 1));
+                lista.push({ x, y, vida: 50 + Math.floor(Math.random() * 30), ataque: 5 + Math.floor(Math.random() * 5), nombre: nombresMonstruos[i] });
             }
             return lista;
         }
 
-        monstruos = generarMonstruos(5);
+        monstruos = generarMonstruos();
 
-        // 🔹 Dibujar laberinto
         function dibujarLaberinto() {
             laberinto.innerHTML = '';
             for (let y = 0; y < mapa.length; y++) {
@@ -169,84 +188,99 @@
                     celda.classList.add('celda');
                     if (mapa[y][x] === 1) celda.classList.add('pared');
                     if (mapa[y][x] === 2) celda.classList.add('meta');
-
                     if (x === jugador.x && y === jugador.y) celda.classList.add('jugador');
-
                     for (const m of monstruos) {
                         if (m.x === x && m.y === y) celda.classList.add('monstruo');
                     }
-
                     laberinto.appendChild(celda);
                 }
             }
-
             actualizarStats();
         }
 
-        // 🔹 Actualizar barras de vida/mana
         function actualizarStats() {
             document.getElementById('vidaJugador').style.width = jugador.vida + '%';
             document.getElementById('manaJugador').style.width = jugador.mana + '%';
         }
 
-        // 🔹 Combate
-        function combate(monstruo) {
-            while (jugador.vida > 0 && monstruo.vida > 0) {
-                let accion = prompt(`Monstruo HP: ${monstruo.vida}\nTu vida: ${jugador.vida}, Mana: ${jugador.mana}\nElige: "ataque" o "magia"`);
-
-                if (accion === 'ataque') {
-                    monstruo.vida -= jugador.ataque;
-                    alert(`Le hiciste ${jugador.ataque} daño`);
-                } else if (accion === 'magia' && jugador.mana >= 10) {
-                    monstruo.vida -= jugador.magia;
-                    jugador.mana -= 10;
-                    alert(`Le hiciste ${jugador.magia} daño con magia`);
-                } else {
-                    alert('Acción inválida o mana insuficiente');
-                    continue;
-                }
-
-                if (monstruo.vida > 0) {
-                    jugador.vida -= monstruo.ataque;
-                    alert(`El monstruo te atacó y te hizo ${monstruo.ataque} daño`);
-                    if (jugador.vida <= 0) {
-                        alert('💀 Has muerto. Vuelves al inicio');
-                        jugador.x = 1;
-                        jugador.y = 1;
-                        jugador.vida = 100;
-                        jugador.mana = 50;
-                        dibujarLaberinto();
-                        return false;
-                    }
-                } else {
-                    alert('🎉 Has derrotado al monstruo!');
-                    const index = monstruos.indexOf(monstruo);
-                    if (index > -1) monstruos.splice(index, 1);
-                    return true;
-                }
-            }
+        function iniciarCombate(monstruo) {
+            enCombate = true;
+            monstruoActual = monstruo;
+            infoCombate.textContent = `¡Has encontrado a ${monstruo.nombre}! HP: ${monstruo.vida}`;
+            menuCombate.style.display = 'flex';
         }
 
-        // 🔹 Mover jugador
+        function ataqueBasico() {
+            if (!monstruoActual) return;
+            monstruoActual.vida -= jugador.ataque;
+            infoCombate.textContent = `Le hiciste ${jugador.ataque} de daño a ${monstruoActual.nombre}. HP del monstruo: ${Math.max(monstruoActual.vida, 0)}`;
+            if (monstruoActual.vida <= 0) {
+                infoCombate.textContent = `🎉 Has derrotado a ${monstruoActual.nombre}!`;
+                const index = monstruos.indexOf(monstruoActual);
+                if (index > -1) monstruos.splice(index, 1);
+                terminarCombate();
+                return;
+            }
+            contraAtaque();
+        }
+
+        function usarMagia() {
+            if (!monstruoActual) return;
+            if (jugador.mana < 10) {
+                infoCombate.textContent = 'No tienes suficiente mana';
+                return;
+            }
+            jugador.mana -= 10;
+            monstruoActual.vida -= jugador.magia;
+            infoCombate.textContent = `Le hiciste ${jugador.magia} de daño con magia a ${monstruoActual.nombre}. HP del monstruo: ${Math.max(monstruoActual.vida, 0)}`;
+            if (monstruoActual.vida <= 0) {
+                infoCombate.textContent = `🎉 Has derrotado a ${monstruoActual.nombre}!`;
+                const index = monstruos.indexOf(monstruoActual);
+                if (index > -1) monstruos.splice(index, 1);
+                terminarCombate();
+                return;
+            }
+            contraAtaque();
+        }
+
+        function contraAtaque() {
+            jugador.vida -= monstruoActual.ataque;
+            infoCombate.textContent += `\n${monstruoActual.nombre} te atacó y te hizo ${monstruoActual.ataque} daño. Vida: ${jugador.vida}`;
+            if (jugador.vida <= 0) {
+                alert('💀 Has muerto. Vuelves al inicio');
+                jugador.vida = 100;
+                jugador.mana = 50;
+                jugador.x = 1;
+                jugador.y = 1;
+                terminarCombate();
+            }
+            actualizarStats();
+        }
+
+        function terminarCombate() {
+            enCombate = false;
+            monstruoActual = null;
+            menuCombate.style.display = 'none';
+            infoCombate.textContent = '';
+            dibujarLaberinto();
+        }
+
         function moverJugador(dx, dy) {
+            if (enCombate) return;
             const nuevoX = jugador.x + dx;
             const nuevoY = jugador.y + dy;
-
             if (nuevoX < 0 || nuevoY < 0 || nuevoX >= columnas || nuevoY >= filas) return;
             if (mapa[nuevoY][nuevoX] === 1) return;
-
             jugador.x = nuevoX;
             jugador.y = nuevoY;
 
-            // Chequear monstruos
             for (const m of monstruos) {
                 if (m.x === jugador.x && m.y === jugador.y) {
-                    combate(m);
+                    iniciarCombate(m);
                     break;
                 }
             }
 
-            // Meta
             if (mapa[nuevoY][nuevoX] === 2) {
                 alert('🎉 ¡Has ganado el laberinto RPG!');
                 window.location.href = 'nivel2.html';
@@ -255,34 +289,17 @@
             dibujarLaberinto();
         }
 
-        // 🔹 Mover monstruos aleatoriamente
-        function moverMonstruos() {
-            for (const m of monstruos) {
-                const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-                const [dx, dy] = dirs[Math.floor(Math.random() * dirs.length)];
-                const nx = m.x + dx;
-                const ny = m.y + dy;
-                if (nx >= 0 && ny >= 0 && nx < columnas && ny < filas && mapa[ny][nx] === 0) {
-                    m.x = nx;
-                    m.y = ny;
-                }
-
-                if (m.x === jugador.x && m.y === jugador.y) {
-                    combate(m);
-                }
-            }
-
-            dibujarLaberinto();
-        }
+        document.getElementById('btnAtaque').addEventListener('click', ataqueBasico);
+        document.getElementById('btnMagia').addEventListener('click', usarMagia);
 
         document.addEventListener('keydown', e => {
+            if (enCombate) return;
             if (e.key === 'ArrowUp') moverJugador(0, -1);
             if (e.key === 'ArrowDown') moverJugador(0, 1);
             if (e.key === 'ArrowLeft') moverJugador(-1, 0);
             if (e.key === 'ArrowRight') moverJugador(1, 0);
         });
 
-        setInterval(moverMonstruos, 1000);
         dibujarLaberinto();
     </script>
 </body>
