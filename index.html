@@ -81,6 +81,16 @@
             z-index: 2;
         }
 
+        .llave {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: radial-gradient(circle, gold, orange);
+            border-radius: 50%;
+            box-shadow: 0 0 15px 5px gold;
+            z-index: 2;
+        }
+
         #mensaje {
             font-size: 1.4rem;
             color: #00ff99;
@@ -106,6 +116,36 @@
             background: #ffa64d;
             box-shadow: 0 0 25px #ff8000;
         }
+
+        #contador {
+            margin-top: 10px;
+            font-size: 1.3rem;
+            color: #ff3333;
+            text-shadow: 0 0 10px red;
+        }
+
+        /* Pantalla jumpscare */
+        #jumpscare {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://i.imgur.com/9pX5g3n.png') center/cover no-repeat;
+            z-index: 9999;
+            animation: parpadeo 0.3s infinite alternate;
+        }
+
+        @keyframes parpadeo {
+            from {
+                filter: brightness(0.8);
+            }
+
+            to {
+                filter: brightness(1.4);
+            }
+        }
     </style>
 </head>
 
@@ -114,7 +154,10 @@
     <h1>🎃 Laberinto de Halloween Avanzado 🎃</h1>
     <div id="laberinto"></div>
     <div id="mensaje"></div>
+    <div id="contador">Tiempo: 90s</div>
     <button id="reiniciar">Reiniciar</button>
+
+    <div id="jumpscare"></div>
 
     <script>
         const FILAS = 21;
@@ -122,13 +165,16 @@
         const laberinto = document.getElementById('laberinto');
         const mensaje = document.getElementById('mensaje');
         const btnReiniciar = document.getElementById('reiniciar');
+        const contador = document.getElementById('contador');
+        const jumpscare = document.getElementById('jumpscare');
+
+        let tiempoRestante = 90;
+        let intervaloTiempo;
 
         // Generar laberinto perfecto
         function generarLaberinto(filas, columnas) {
-            // Inicializamos mapa lleno de paredes
             const mapa = Array.from({ length: filas }, () => Array(columnas).fill(1));
 
-            // Algoritmo Recursive Backtracking
             function esValido(f, c) {
                 return f >= 0 && f < filas && c >= 0 && c < columnas;
             }
@@ -138,13 +184,12 @@
             }
 
             function crearCamino(f, c) {
-                mapa[f][c] = 0; // camino
+                mapa[f][c] = 0;
                 const direcciones = shuffle([[0, 1], [0, -1], [1, 0], [-1, 0]]);
                 for (let [df, dc] of direcciones) {
                     const nf = f + df * 2;
                     const nc = c + dc * 2;
                     if (esValido(nf, nc) && mapa[nf][nc] === 1) {
-                        // romper la pared intermedia
                         mapa[f + df][c + dc] = 0;
                         crearCamino(nf, nc);
                     }
@@ -152,16 +197,12 @@
             }
 
             crearCamino(0, 0);
-
-            // Asegurar la meta accesible
             mapa[filas - 1][columnas - 1] = 0;
-
             return mapa;
         }
 
         let mapa = generarLaberinto(FILAS, COLUMNAS);
 
-        // Crear jugador y meta
         const jugador = document.createElement('div');
         jugador.id = 'jugador';
         const meta = document.createElement('div');
@@ -172,7 +213,22 @@
         let fila = 0, col = 0;
         const metaFila = FILAS - 1, metaCol = COLUMNAS - 1;
 
-        // Dibujar laberinto
+        let llaves = [];
+        let llavesObtenidas = 0;
+        let puertaAbierta = false;
+
+        function generarLlaves() {
+            llaves = [];
+            for (let i = 0; i < 3; i++) {
+                let f, c;
+                do {
+                    f = Math.floor(Math.random() * FILAS);
+                    c = Math.floor(Math.random() * COLUMNAS);
+                } while (mapa[f][c] !== 0 || (f === 0 && c === 0) || (f === metaFila && c === metaCol));
+                llaves.push({ f, c });
+            }
+        }
+
         function dibujarLaberinto() {
             laberinto.innerHTML = "";
             mapa.forEach(filaM => {
@@ -184,9 +240,16 @@
             });
             laberinto.appendChild(jugador);
             laberinto.appendChild(meta);
+
+            llaves.forEach((l) => {
+                const llave = document.createElement('div');
+                llave.className = 'llave';
+                llave.style.top = l.f * (32 + 2) + 10 + "px";
+                llave.style.left = l.c * (32 + 2) + 10 + "px";
+                laberinto.appendChild(llave);
+            });
         }
 
-        // Posicionar jugador y meta
         function actualizarPosiciones() {
             jugador.style.top = fila * (32 + 2) + 10 + "px";
             jugador.style.left = col * (32 + 2) + 10 + "px";
@@ -197,27 +260,50 @@
             meta.style.left = metaCol * (32 + 2) + 10 + "px";
         }
 
-        // Victoria
         function mostrarVictoria() {
             mensaje.textContent = "👻 ¡Has escapado del laberinto embrujado! 🎃";
             jugador.style.boxShadow = "0 0 30px 12px #00ff99";
+            clearInterval(intervaloTiempo);
         }
 
-        // Reiniciar
         function reiniciarJuego() {
             fila = 0;
             col = 0;
             mensaje.textContent = "";
             jugador.style.boxShadow = "0 0 25px 8px #ff8000";
             mapa = generarLaberinto(FILAS, COLUMNAS);
+            generarLlaves();
+            llavesObtenidas = 0;
+            puertaAbierta = false;
+            tiempoRestante = 90;
+            contador.textContent = "Tiempo: 90s";
+            clearInterval(intervaloTiempo);
             dibujarLaberinto();
             actualizarPosiciones();
             colocarMeta();
+            iniciarTemporizador();
+        }
+
+        function iniciarTemporizador() {
+            intervaloTiempo = setInterval(() => {
+                tiempoRestante--;
+                contador.textContent = `Tiempo: ${tiempoRestante}s`;
+                if (tiempoRestante <= 0) {
+                    clearInterval(intervaloTiempo);
+                    activarJumpscare();
+                }
+            }, 1000);
+        }
+
+        function activarJumpscare() {
+            jumpscare.style.display = 'block';
+            mensaje.textContent = "💀 ¡El tiempo se acabó! 💀";
+            const grito = new Audio("https://www.myinstants.com/media/sounds/scream_1.mp3");
+            grito.play();
         }
 
         btnReiniciar.addEventListener('click', reiniciarJuego);
 
-        // Movimientos
         window.addEventListener('keydown', (e) => {
             if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
 
@@ -238,17 +324,36 @@
                 col = nuevaCol;
                 actualizarPosiciones();
 
-                if (fila === metaFila && col === metaCol) mostrarVictoria();
+                // Comprobar si hay llave
+                llaves.forEach((l, i) => {
+                    if (l && l.f === fila && l.c === col) {
+                        llavesObtenidas++;
+                        mensaje.textContent = `🔑 Llave ${llavesObtenidas}/3 obtenida`;
+                        llaves[i] = null;
+                        dibujarLaberinto();
+                        actualizarPosiciones();
+                        colocarMeta();
+                    }
+                });
+
+                if (llavesObtenidas === 3 && !puertaAbierta) {
+                    puertaAbierta = true;
+                    mensaje.textContent = "🚪 ¡La puerta está abierta! Corre hacia la salida 🎃";
+                }
+
+                if (fila === metaFila && col === metaCol) {
+                    if (puertaAbierta) mostrarVictoria();
+                    else mensaje.textContent = "🚪 La puerta está cerrada... busca las 3 llaves 🔑";
+                }
             }
         });
 
-        // Inicializar
+        generarLlaves();
         dibujarLaberinto();
         actualizarPosiciones();
         colocarMeta();
+        iniciarTemporizador();
     </script>
-
-
 
 </body>
 
