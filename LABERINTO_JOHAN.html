@@ -47,32 +47,43 @@
     <div id="laberinto"></div>
 
     <script>
-        // 1 = pared, 0 = camino, 2 = meta
-        const mapa = [
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1],
-            [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1],
-            [1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1],
-            [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1],
-            [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-            [1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1],
-            [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1],
-            [1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1],
-            [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1],
-            [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1],
-            [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-            [1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 1],
-            [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1],
-            [1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1],
-            [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-            [1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1],
-            [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
-            [1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 2, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        ];
-
+        const filas = 20;
+        const columnas = 20;
         const laberinto = document.getElementById('laberinto');
+        let mapa = [];
         let jugador = { x: 1, y: 1 };
+
+        // 🔹 Generar laberinto aleatorio (tipo "laberinto perfecto")
+        function generarLaberinto(filas, columnas) {
+            const grid = Array.from({ length: filas }, () => Array(columnas).fill(1));
+
+            function esValido(f, c) {
+                return f > 0 && f < filas - 1 && c > 0 && c < columnas - 1;
+            }
+
+            function mezclar(arr) {
+                return arr.sort(() => Math.random() - 0.5);
+            }
+
+            function tallar(f, c) {
+                grid[f][c] = 0;
+                const dirs = mezclar([[1, 0], [-1, 0], [0, 1], [0, -1]]);
+                for (const [df, dc] of dirs) {
+                    const nf = f + df * 2;
+                    const nc = c + dc * 2;
+                    if (esValido(nf, nc) && grid[nf][nc] === 1) {
+                        grid[f + df][c + dc] = 0;
+                        tallar(nf, nc);
+                    }
+                }
+            }
+
+            tallar(1, 1);
+            grid[filas - 2][columnas - 2] = 2; // meta
+            return grid;
+        }
+
+        mapa = generarLaberinto(filas, columnas);
 
         function dibujarLaberinto() {
             laberinto.innerHTML = '';
@@ -92,7 +103,8 @@
             const nuevoX = jugador.x + dx;
             const nuevoY = jugador.y + dy;
 
-            // Si toca pared, reinicia
+            if (nuevoX < 0 || nuevoY < 0 || nuevoX >= columnas || nuevoY >= filas) return;
+
             if (mapa[nuevoY][nuevoX] === 1) {
                 alert('💀 Tocaste una pared. ¡Vuelves al inicio!');
                 jugador.x = 1;
@@ -101,7 +113,6 @@
                 return;
             }
 
-            // Si es camino o meta, avanza
             jugador.x = nuevoX;
             jugador.y = nuevoY;
 
