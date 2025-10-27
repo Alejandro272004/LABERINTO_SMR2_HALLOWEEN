@@ -53,7 +53,7 @@
         let mapa = [];
         let jugador = { x: 1, y: 1 };
 
-        // 🔹 Generar laberinto aleatorio (con puerta de salida accesible)
+        // 🔹 Generar laberinto aleatorio (con entrada y salida garantizadas)
         function generarLaberinto(filas, columnas) {
             const grid = Array.from({ length: filas }, () => Array(columnas).fill(1));
 
@@ -78,19 +78,30 @@
                 }
             }
 
-            // Iniciar desde (1,1)
+            // 🌀 Generar desde la entrada (1,1)
             tallar(1, 1);
 
-            // 🔸 Crear "puerta" cerca de la meta
+            // 🔸 Asegurar entrada abierta
+            grid[0][1] = 0;
+            grid[1][1] = 0;
+
+            // 🔸 Asegurar salida accesible
             const mf = filas - 2;
             const mc = columnas - 2;
             grid[mf][mc] = 2; // meta
-            grid[mf][mc - 1] = 0; // camino antes de la meta
-            grid[mf - 1][mc] = 0; // acceso desde arriba
+            grid[mf][mc - 1] = 0; // izquierda abierta
+            grid[mf - 1][mc] = 0; // arriba abierta
+            grid[mf - 1][mc - 1] = 0; // diagonal abierta
 
-            // 🔸 Asegurar entrada
-            grid[1][1] = 0;
-            grid[0][1] = 0; // hueco de entrada
+            // 🔸 Quitar muros bloqueantes alrededor de la meta (por seguridad)
+            for (let df = -1; df <= 1; df++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (mf + df > 0 && mc + dc > 0 && mf + df < filas && mc + dc < columnas) {
+                        if (Math.random() < 0.6) grid[mf + df][mc + dc] = 0;
+                    }
+                }
+            }
+
             return grid;
         }
 
@@ -128,7 +139,8 @@
             jugador.y = nuevoY;
 
             if (mapa[nuevoY][nuevoX] === 2) {
-                setTimeout(() => alert('🎉 ¡Has ganado el laberinto gigante!'), 100);
+                // Abre otro HTML cuando gana
+                window.location.href = "victoria.html"; // cambia por tu archivo destino
             }
 
             dibujarLaberinto();
