@@ -79,7 +79,12 @@
             }
 
             tallar(1, 1);
-            grid[filas - 2][columnas - 2] = 2; // meta
+
+            // 🔸 Meta ajustada dentro del laberinto y accesible
+            grid[filas - 3][columnas - 3] = 2; // meta dentro, no pegada al borde
+            grid[filas - 3][columnas - 4] = 0; // camino hacia la meta
+            grid[filas - 4][columnas - 3] = 0; // acceso superior
+
             return grid;
         }
 
