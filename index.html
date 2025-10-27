@@ -38,7 +38,8 @@
 
         .meta {
             background: #28a745;
-            border-radius: 5px;
+            border-radius: 50%;
+            border: 2px solid #1b5e20;
         }
     </style>
 </head>
@@ -53,7 +54,7 @@
         let mapa = [];
         let jugador = { x: 1, y: 1 };
 
-        // 🔹 Generar laberinto aleatorio (con entrada y salida garantizadas)
+        // 🔹 Generar laberinto aleatorio (meta dentro del laberinto)
         function generarLaberinto(filas, columnas) {
             const grid = Array.from({ length: filas }, () => Array(columnas).fill(1));
 
@@ -81,23 +82,20 @@
             // 🌀 Generar desde la entrada (1,1)
             tallar(1, 1);
 
-            // 🔸 Asegurar entrada abierta
+            // 🔸 Asegurar entrada libre
             grid[0][1] = 0;
             grid[1][1] = 0;
 
-            // 🔸 Asegurar salida accesible
-            const mf = filas - 2;
-            const mc = columnas - 2;
+            // 🔸 Colocar meta dentro del laberinto (no en el borde)
+            const mf = filas - 3; // una fila antes del borde
+            const mc = columnas - 3; // una columna antes del borde
             grid[mf][mc] = 2; // meta
-            grid[mf][mc - 1] = 0; // izquierda abierta
-            grid[mf - 1][mc] = 0; // arriba abierta
-            grid[mf - 1][mc - 1] = 0; // diagonal abierta
 
-            // 🔸 Quitar muros bloqueantes alrededor de la meta (por seguridad)
+            // 🔸 Asegurar espacio libre alrededor de la meta
             for (let df = -1; df <= 1; df++) {
                 for (let dc = -1; dc <= 1; dc++) {
                     if (mf + df > 0 && mc + dc > 0 && mf + df < filas && mc + dc < columnas) {
-                        if (Math.random() < 0.6) grid[mf + df][mc + dc] = 0;
+                        grid[mf + df][mc + dc] = 0;
                     }
                 }
             }
@@ -139,8 +137,7 @@
             jugador.y = nuevoY;
 
             if (mapa[nuevoY][nuevoX] === 2) {
-                // Abre otro HTML cuando gana
-                window.location.href = "victoria.html"; // cambia por tu archivo destino
+                window.location.href = "victoria.html"; // cambia el nombre si quieres otro archivo
             }
 
             dibujarLaberinto();
