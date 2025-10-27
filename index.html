@@ -3,155 +3,323 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laberinto Grande en HTML</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>🎃 Laberinto de Halloween Avanzado 🎃</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&display=swap" rel="stylesheet">
+
     <style>
         body {
-            background: #0f172a;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            height: 100vh;
+            justify-content: flex-start;
+            background: radial-gradient(circle at center, #4a0e5c 0%, #1b0033 60%, #000 100%);
+            font-family: 'Creepster', cursive;
+            color: #ffb347;
+            min-height: 100vh;
+            margin: 0;
+            padding-top: 20px;
+        }
+
+        h1 {
+            text-shadow: 2px 2px 12px #000, 0 0 25px #ff6600;
+            color: #ff9933;
+            margin-bottom: 15px;
+            font-size: 2rem;
         }
 
         #laberinto {
+            position: relative;
             display: grid;
-            grid-template-columns: repeat(20, 30px);
-            grid-template-rows: repeat(20, 30px);
+            grid-template-columns: repeat(21, 32px);
+            grid-template-rows: repeat(21, 32px);
             gap: 2px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 0 25px 8px rgba(255, 140, 0, 0.4);
         }
 
-        .celda {
-            width: 30px;
-            height: 30px;
-            background: #0f172a;
+        .pared,
+        .camino {
+            width: 32px;
+            height: 32px;
+            border-radius: 4px;
         }
 
         .pared {
-            background: #0e162b;
+            background:
+                repeating-linear-gradient(0deg, #b22222, #b22222 8px, #d13a3a 8px, #d13a3a 16px),
+                repeating-linear-gradient(90deg, #b22222, #b22222 16px, #d13a3a 16px, #d13a3a 32px);
+            box-shadow: inset 1px 1px 4px #000, 0 0 10px 2px rgba(255, 80, 0, 0.5);
         }
 
-        .jugador {
-            background: #007bff;
-            border-radius: 5px;
+        .camino {
+            background-color: #eaeaea;
+            box-shadow: inset 0 0 4px #999;
+        }
+
+        #jugador {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            background: radial-gradient(circle at 30% 30%, #ffb347, #ff6600 70%);
+            border-radius: 50%;
+            box-shadow: 0 0 25px 8px #ff8000;
+            transition: top 0.15s ease, left 0.15s ease;
+            z-index: 3;
         }
 
         .meta {
-            background: #28a745;
+            position: absolute;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
-            border: 2px solid #1b5e20;
+            background: radial-gradient(circle, #66ffcc, #009966);
+            box-shadow: 0 0 25px 8px #66ffcc;
+            z-index: 2;
+        }
+
+        .llave {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: radial-gradient(circle, gold, orange);
+            border-radius: 50%;
+            box-shadow: 0 0 15px 5px gold;
+            z-index: 2;
+        }
+
+        #mensaje {
+            font-size: 1.4rem;
+            color: #00ff99;
+            text-shadow: 0 0 8px #00ff99;
+            margin-top: 15px;
+            min-height: 28px;
+        }
+
+        #contador {
+            margin-top: 10px;
+            font-size: 1.3rem;
+            color: #ff3333;
+            text-shadow: 0 0 10px red;
+        }
+
+        /* Pantalla jumpscare */
+        #jumpscare {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('https://i.makeagif.com/media/7-27-2018/w5L2kb.gif') center/cover no-repeat;
+            z-index: 9999;
+            animation: parpadeo 0.3s infinite alternate;
+        }
+
+        @keyframes parpadeo {
+            from {
+                filter: brightness(0.8);
+            }
+
+            to {
+                filter: brightness(1.4);
+            }
         }
     </style>
 </head>
 
 <body>
+
+    <h1>🎃 Laberinto de Halloween Avanzado 🎃</h1>
     <div id="laberinto"></div>
+    <div id="mensaje"></div>
+    <div id="contador">Tiempo: 90s</div>
+
+    <div id="jumpscare"></div>
 
     <script>
-        const filas = 20;
-        const columnas = 20;
+        const FILAS = 21;
+        const COLUMNAS = 21;
         const laberinto = document.getElementById('laberinto');
-        let mapa = [];
-        let jugador = { x: 1, y: 1 };
+        const mensaje = document.getElementById('mensaje');
+        const contador = document.getElementById('contador');
+        const jumpscare = document.getElementById('jumpscare');
 
-        // 🔹 Generar laberinto aleatorio (meta dentro del laberinto)
+        let tiempoRestante = 90;
+        let intervaloTiempo;
+
+        // Generar laberinto perfecto
         function generarLaberinto(filas, columnas) {
-            const grid = Array.from({ length: filas }, () => Array(columnas).fill(1));
+            const mapa = Array.from({ length: filas }, () => Array(columnas).fill(1));
 
             function esValido(f, c) {
-                return f > 0 && f < filas - 1 && c > 0 && c < columnas - 1;
+                return f >= 0 && f < filas && c >= 0 && c < columnas;
             }
 
-            function mezclar(arr) {
-                return arr.sort(() => Math.random() - 0.5);
+            function shuffle(array) {
+                return array.sort(() => Math.random() - 0.5);
             }
 
-            function tallar(f, c) {
-                grid[f][c] = 0;
-                const dirs = mezclar([[1, 0], [-1, 0], [0, 1], [0, -1]]);
-                for (const [df, dc] of dirs) {
+            function crearCamino(f, c) {
+                mapa[f][c] = 0;
+                const direcciones = shuffle([[0, 1], [0, -1], [1, 0], [-1, 0]]);
+                for (let [df, dc] of direcciones) {
                     const nf = f + df * 2;
                     const nc = c + dc * 2;
-                    if (esValido(nf, nc) && grid[nf][nc] === 1) {
-                        grid[f + df][c + dc] = 0;
-                        tallar(nf, nc);
+                    if (esValido(nf, nc) && mapa[nf][nc] === 1) {
+                        mapa[f + df][c + dc] = 0;
+                        crearCamino(nf, nc);
                     }
                 }
             }
 
-            // 🌀 Generar desde la entrada (1,1)
-            tallar(1, 1);
-
-            // 🔸 Asegurar entrada libre
-            grid[0][1] = 0;
-            grid[1][1] = 0;
-
-            // 🔸 Colocar meta dentro del laberinto (no en el borde)
-            const mf = filas - 3; // una fila antes del borde
-            const mc = columnas - 3; // una columna antes del borde
-            grid[mf][mc] = 2; // meta
-
-            // 🔸 Asegurar espacio libre alrededor de la meta
-            for (let df = -1; df <= 1; df++) {
-                for (let dc = -1; dc <= 1; dc++) {
-                    if (mf + df > 0 && mc + dc > 0 && mf + df < filas && mc + dc < columnas) {
-                        grid[mf + df][mc + dc] = 0;
-                    }
-                }
-            }
-
-            return grid;
+            crearCamino(0, 0);
+            mapa[filas - 1][columnas - 1] = 0;
+            return mapa;
         }
 
-        mapa = generarLaberinto(filas, columnas);
+        let mapa = generarLaberinto(FILAS, COLUMNAS);
+
+        const jugador = document.createElement('div');
+        jugador.id = 'jugador';
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        laberinto.appendChild(jugador);
+        laberinto.appendChild(meta);
+
+        let fila = 0, col = 0;
+        const metaFila = FILAS - 1, metaCol = COLUMNAS - 1;
+
+        let llaves = [];
+        let llavesObtenidas = 0;
+        let puertaAbierta = false;
+
+        function generarLlaves() {
+            llaves = [];
+            for (let i = 0; i < 3; i++) {
+                let f, c;
+                do {
+                    f = Math.floor(Math.random() * FILAS);
+                    c = Math.floor(Math.random() * COLUMNAS);
+                } while (mapa[f][c] !== 0 || (f === 0 && c === 0) || (f === metaFila && c === metaCol));
+                llaves.push({ f, c });
+            }
+        }
 
         function dibujarLaberinto() {
-            laberinto.innerHTML = '';
-            for (let y = 0; y < mapa.length; y++) {
-                for (let x = 0; x < mapa[y].length; x++) {
-                    const celda = document.createElement('div');
-                    celda.classList.add('celda');
-                    if (mapa[y][x] === 1) celda.classList.add('pared');
-                    if (mapa[y][x] === 2) celda.classList.add('meta');
-                    if (x === jugador.x && y === jugador.y) celda.classList.add('jugador');
-                    laberinto.appendChild(celda);
+            laberinto.innerHTML = "";
+            mapa.forEach(filaM => {
+                filaM.forEach(celda => {
+                    const div = document.createElement('div');
+                    div.className = celda === 1 ? 'pared' : 'camino';
+                    laberinto.appendChild(div);
+                });
+            });
+            laberinto.appendChild(jugador);
+            laberinto.appendChild(meta);
+
+            llaves.forEach((l) => {
+                const llave = document.createElement('div');
+                llave.className = 'llave';
+                llave.style.top = l.f * (32 + 2) + 10 + "px";
+                llave.style.left = l.c * (32 + 2) + 10 + "px";
+                laberinto.appendChild(llave);
+            });
+        }
+
+        function actualizarPosiciones() {
+            jugador.style.top = fila * (32 + 2) + 10 + "px";
+            jugador.style.left = col * (32 + 2) + 10 + "px";
+        }
+
+        function colocarMeta() {
+            meta.style.top = metaFila * (32 + 2) + 10 + "px";
+            meta.style.left = metaCol * (32 + 2) + 10 + "px";
+        }
+
+        function mostrarVictoria() {
+            mensaje.textContent = "👻 ¡Has escapado del laberinto embrujado! 🎃";
+            jugador.style.boxShadow = "0 0 30px 12px #00ff99";
+            clearInterval(intervaloTiempo);
+
+            // 🔗 Redirigir a otro archivo HTML después de un pequeño efecto
+            setTimeout(() => {
+                window.location.href = "LABERINTO_JOHAN.html"; // <-- cambia este nombre si quieres
+            }, 2000);
+        }
+
+        function iniciarTemporizador() {
+            intervaloTiempo = setInterval(() => {
+                tiempoRestante--;
+                contador.textContent = `Tiempo: ${tiempoRestante}s`;
+                if (tiempoRestante <= 0) {
+                    clearInterval(intervaloTiempo);
+                    activarJumpscare();
+                }
+            }, 1000);
+        }
+
+        function activarJumpscare() {
+            jumpscare.style.display = 'block';
+            mensaje.textContent = "💀 ¡El tiempo se acabó! 💀";
+            const grito = new Audio("https://www.myinstants.com/media/sounds/scream_1.mp3");
+            grito.play();
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
+
+            let nuevaFila = fila;
+            let nuevaCol = col;
+
+            if (e.key === 'ArrowUp' || e.key === 'w') nuevaFila--;
+            else if (e.key === 'ArrowDown' || e.key === 's') nuevaFila++;
+            else if (e.key === 'ArrowLeft' || e.key === 'a') nuevaCol--;
+            else if (e.key === 'ArrowRight' || e.key === 'd') nuevaCol++;
+
+            if (
+                nuevaFila >= 0 && nuevaFila < mapa.length &&
+                nuevaCol >= 0 && nuevaCol < mapa[0].length &&
+                mapa[nuevaFila][nuevaCol] === 0
+            ) {
+                fila = nuevaFila;
+                col = nuevaCol;
+                actualizarPosiciones();
+
+                // Comprobar si hay llave
+                llaves.forEach((l, i) => {
+                    if (l && l.f === fila && l.c === col) {
+                        llavesObtenidas++;
+                        mensaje.textContent = `🔑 Llave ${llavesObtenidas}/3 obtenida`;
+                        llaves[i] = null;
+                        dibujarLaberinto();
+                        actualizarPosiciones();
+                        colocarMeta();
+                    }
+                });
+
+                if (llavesObtenidas === 3 && !puertaAbierta) {
+                    puertaAbierta = true;
+                    mensaje.textContent = "🚪 ¡La puerta está abierta! Corre hacia la salida 🎃";
+                }
+
+                if (fila === metaFila && col === metaCol) {
+                    if (puertaAbierta) mostrarVictoria();
+                    else mensaje.textContent = "🚪 La puerta está cerrada... busca las 3 llaves 🔑";
                 }
             }
-        }
-
-        function moverJugador(dx, dy) {
-            const nuevoX = jugador.x + dx;
-            const nuevoY = jugador.y + dy;
-
-            if (nuevoX < 0 || nuevoY < 0 || nuevoX >= columnas || nuevoY >= filas) return;
-
-            if (mapa[nuevoY][nuevoX] === 1) {
-                alert('💀 Tocaste una pared. ¡Vuelves al inicio!');
-                jugador.x = 1;
-                jugador.y = 1;
-                dibujarLaberinto();
-                return;
-            }
-
-            jugador.x = nuevoX;
-            jugador.y = nuevoY;
-
-            if (mapa[nuevoY][nuevoX] === 2) {
-                window.location.href = "victoria.html"; // cambia el nombre si quieres otro archivo
-            }
-
-            dibujarLaberinto();
-        }
-
-        document.addEventListener('keydown', e => {
-            if (e.key === 'ArrowUp') moverJugador(0, -1);
-            if (e.key === 'ArrowDown') moverJugador(0, 1);
-            if (e.key === 'ArrowLeft') moverJugador(-1, 0);
-            if (e.key === 'ArrowRight') moverJugador(1, 0);
         });
 
+        generarLlaves();
         dibujarLaberinto();
+        actualizarPosiciones();
+        colocarMeta();
+        iniciarTemporizador();
     </script>
+
 </body>
 
 </html>
