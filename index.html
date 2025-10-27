@@ -99,24 +99,6 @@
             min-height: 28px;
         }
 
-        #reiniciar {
-            background: #ff6600;
-            color: #111;
-            border: none;
-            padding: 10px 22px;
-            border-radius: 8px;
-            font-size: 1rem;
-            cursor: pointer;
-            margin-top: 12px;
-            transition: 0.2s;
-            box-shadow: 0 0 15px #ff6600;
-        }
-
-        #reiniciar:hover {
-            background: #ffa64d;
-            box-shadow: 0 0 25px #ff8000;
-        }
-
         #contador {
             margin-top: 10px;
             font-size: 1.3rem;
@@ -155,7 +137,6 @@
     <div id="laberinto"></div>
     <div id="mensaje"></div>
     <div id="contador">Tiempo: 90s</div>
-    <button id="reiniciar">Reiniciar</button>
 
     <div id="jumpscare"></div>
 
@@ -164,7 +145,6 @@
         const COLUMNAS = 21;
         const laberinto = document.getElementById('laberinto');
         const mensaje = document.getElementById('mensaje');
-        const btnReiniciar = document.getElementById('reiniciar');
         const contador = document.getElementById('contador');
         const jumpscare = document.getElementById('jumpscare');
 
@@ -266,24 +246,6 @@
             clearInterval(intervaloTiempo);
         }
 
-        function reiniciarJuego() {
-            fila = 0;
-            col = 0;
-            mensaje.textContent = "";
-            jugador.style.boxShadow = "0 0 25px 8px #ff8000";
-            mapa = generarLaberinto(FILAS, COLUMNAS);
-            generarLlaves();
-            llavesObtenidas = 0;
-            puertaAbierta = false;
-            tiempoRestante = 90;
-            contador.textContent = "Tiempo: 90s";
-            clearInterval(intervaloTiempo);
-            dibujarLaberinto();
-            actualizarPosiciones();
-            colocarMeta();
-            iniciarTemporizador();
-        }
-
         function iniciarTemporizador() {
             intervaloTiempo = setInterval(() => {
                 tiempoRestante--;
@@ -301,8 +263,6 @@
             const grito = new Audio("https://www.myinstants.com/media/sounds/scream_1.mp3");
             grito.play();
         }
-
-        btnReiniciar.addEventListener('click', reiniciarJuego);
 
         window.addEventListener('keydown', (e) => {
             if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
