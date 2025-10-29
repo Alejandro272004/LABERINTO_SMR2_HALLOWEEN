@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Aventura en el Laberinto</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/69/69524.png">
+    <style>
+        body {
+            background: #0f172a;
+            color: #e0e7ef;
+            font-family: Arial, sans-serif;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+        }
+
+        #glow-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background: rgba(255, 255, 255, 0.9);
+            opacity: 0;
+            transition: all 0.7s;
+            filter: blur(2px);
+            z-index: 1000;
+        }
+
+        #glow-overlay.visible {
+            opacity: 1;
+            backdrop-filter: blur(20px) brightness(1.5);
+            box-shadow: 0 0 100px 50px white inset;
+        }
+
+        .btn {
+            margin-top: 18px;
+            background: #fbbf24;
+            color: #222;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 18px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+
+        h1 {
+            margin-top: 32px;
+            margin-bottom: 12px;
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            background: #0f172a;
+        }
+
+        .desc {
+            color: #94a3b8;
+            font-size: 0.95em;
+            margin-top: 8px;
+        }
+
+        #win-message {
+            margin-top: 18px;
+            color: #22c55e;
+            font-size: 1.1em;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.6s ease, transform 0.6s ease;
+            transform: translateY(10px);
+        }
+
+        #win-message.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        #back-btn {
+            margin-top: 28px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 20px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+
+        #back-btn:hover {
+            background: #059669;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="center">
+        <a href="index.html"
+            style="color:#10b981; text-decoration:underline; font-size:1.1em; margin-bottom:18px; align-self:flex-start;">&larr;
+            Volver al inicio</a>
+        <h1>Aventura en el Laberinto</h1>
+        <canvas id="maze-canvas"></canvas>
+        <p class="desc">Muévete con las flechas o WASD. Objetivo: llegar al cuadro verde.</p>
+        <!-- Botón de reiniciar eliminado -->
+        <div id="win-message">¡Has ganado el laberinto! 🏆 Has ganado una ficha 🎉</div>
+        <button id="back-btn" onclick="window.location.href='index.html'">Volver al pasillo</button>
+        <div id="glow-overlay"></div>
+    </div>
+
+    <script>
+        const cols = 21, rows = 21, cellSize = 20;
+        let player = { x: 1, y: 1 };
+        let endCell = { x: cols - 2, y: rows - 2 };
+        let grid = null;
+        let glowTriggered = false;
+        let gameWon = false;
+
+        const canvas = document.getElementById('maze-canvas');
+        const winMessage = document.getElementById('win-message');
+
+        function generateMaze(w, h) {
+            const grid = Array.from({ length: h }, () => Array.from({ length: w }, () => 1));
+
+            function shuffle(a) {
+                for (let i = a.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [a[i], a[j]] = [a[j], a[i]];
+                }
+                return a;
+            }
+
+            function carve(cx, cy) {
+                grid[cy][cx] = 0;
+                const dirs = shuffle([[2, 0], [-2, 0], [0, 2], [0, -2]]);
+                for (const [dx, dy] of dirs) {
+                    const nx = cx + dx, ny = cy + dy;
+                    if (nx > 0 && nx < w - 1 && ny > 0 && ny < h - 1 && grid[ny][nx] === 1) {
+                        grid[cy + dy / 2][cx + dx / 2] = 0;
+                        carve(nx, ny);
+                    }
+                }
+            }
+
+            carve(1, 1);
+            return grid;
+        }
+
+        function draw() {
+            canvas.width = cols * cellSize;
+            canvas.height = rows * cellSize;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    if (grid[y][x] === 1) {
+                        ctx.fillStyle = '#111827';
+                        ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    }
+                }
+            }
+
+            // Cuadro verde de meta
+            ctx.fillStyle = '#10b981';
+            ctx.fillRect(endCell.x * cellSize + 2, endCell.y * cellSize + 2, cellSize - 4, cellSize - 4);
+
+            // Jugador
+            ctx.fillStyle = '#f97316';
+            ctx.beginPath();
+            ctx.arc(player.x * cellSize + cellSize / 2, player.y * cellSize + cellSize / 2, cellSize / 2 - 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function triggerGlow() {
+            glowTriggered = true;
+            const overlay = document.getElementById('glow-overlay');
+            overlay.classList.add('visible');
+            setTimeout(() => { overlay.classList.remove('visible'); }, 2000);
+        }
+
+        function showWinMessage() {
+            winMessage.classList.add('visible');
+            gameWon = true;
+            localStorage.setItem('minijuego_laberinto', 'true');
+
+
+            // 🔹 Guardar progreso del minijuego en localStorage
+            localStorage.setItem('minijuego_laberinto', 'true');
+        }
+
+
+        function resetGame() {
+            grid = generateMaze(cols, rows);
+            player = { x: 1, y: 1 };
+            endCell = { x: cols - 2, y: rows - 2 };
+            glowTriggered = false;
+            gameWon = false;
+            winMessage.classList.remove('visible');
+            draw();
+        }
+
+        function handleKey(e) {
+            if (!grid || gameWon) return;
+            const { x, y } = player;
+            let nx = x, ny = y;
+            if (e.key === 'ArrowUp' || e.key === 'w') ny -= 1;
+            if (e.key === 'ArrowDown' || e.key === 's') ny += 1;
+            if (e.key === 'ArrowLeft' || e.key === 'a') nx -= 1;
+            if (e.key === 'ArrowRight' || e.key === 'd') nx += 1;
+
+            if (nx === x && ny === y) return;
+            if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && grid[ny][nx] === 0) {
+                player = { x: nx, y: ny };
+                draw();
+
+                if (player.x === endCell.x && player.y === endCell.y) {
+                    triggerGlow();
+                    showWinMessage();
+                } else {
+                    const dx = player.x - endCell.x, dy = player.y - endCell.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist <= 3 && !glowTriggered) triggerGlow();
+                }
+            }
+        }
+
+        document.addEventListener('keydown', handleKey);
+
+        // Inicializar
+        grid = generateMaze(cols, rows);
+        draw();
+        window.resetGame = resetGame;
+    </script>
+</body>
+
+</html>
