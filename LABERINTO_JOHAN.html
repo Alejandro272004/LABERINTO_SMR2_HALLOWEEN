@@ -95,6 +95,7 @@
             mapa[filas - 2][columnas - 2] = 2;
         }
 
+        // Dibujar laberinto
         function dibujarLaberinto() {
             laberinto.innerHTML = '';
             for (let y = 0; y < filas; y++) {
@@ -112,6 +113,7 @@
             }
         }
 
+        // Movimiento jugador
         function moverJugador(dx, dy) {
             const nx = jugador.x + dx;
             const ny = jugador.y + dy;
@@ -129,8 +131,8 @@
             dibujarLaberinto();
         }
 
-        // ✅ BFS rápido (solo un paso hacia el jugador)
-        function pasoHaciaJugador(inicio, objetivo) {
+        // ✅ BFS seguro con límite de distancia
+        function pasoHaciaJugadorSeguro(inicio, objetivo, maxDist = 8) {
             const cola = [inicio];
             const cameFrom = {};
             const hash = p => `${p.x},${p.y}`;
@@ -138,7 +140,22 @@
 
             while (cola.length > 0) {
                 const actual = cola.shift();
-                if (actual.x === objetivo.x && actual.y === objetivo.y) break;
+
+                // detener si el camino es demasiado largo
+                const dist = Math.abs(actual.x - inicio.x) + Math.abs(actual.y - inicio.y);
+                if (dist > maxDist) continue;
+
+                if (actual.x === objetivo.x && actual.y === objetivo.y) {
+                    // reconstruir un paso
+                    let paso = actual;
+                    let previo = cameFrom[hash(paso)];
+                    if (!previo) return null;
+                    while (previo && cameFrom[hash(previo)]) {
+                        paso = previo;
+                        previo = cameFrom[hash(previo)];
+                    }
+                    return paso;
+                }
 
                 const dirs = [
                     { x: actual.x + 1, y: actual.y },
@@ -156,25 +173,18 @@
                 }
             }
 
-            // reconstruir solo el primer paso
-            let paso = objetivo;
-            let previo = cameFrom[hash(paso)];
-            if (!previo) return null;
-            while (previo && cameFrom[hash(previo)]) {
-                paso = previo;
-                previo = cameFrom[hash(previo)];
-            }
-            return paso;
+            // sin camino válido
+            return null;
         }
 
-        // ✅ Movimiento enemigos mejorado
+        // Movimiento enemigos
         function moverEnemigos() {
             for (const e of enemigos) {
                 let moved = false;
 
+                // Si el jugador está visible, persigue (solo si hay camino corto)
                 if (lineaVision(e, jugador)) {
-                    // Si ve al jugador → lo persigue un paso
-                    const paso = pasoHaciaJugador(e, jugador);
+                    const paso = pasoHaciaJugadorSeguro(e, jugador);
                     if (paso) {
                         e.x = paso.x;
                         e.y = paso.y;
@@ -182,23 +192,20 @@
                     }
                 }
 
-                // Si no lo ve → patrulla aleatoria larga
+                // Si no ve al jugador → moverse aleatoriamente por el mapa
                 if (!moved) {
-                    const caminos = [];
-                    const dirs = [
+                    const direcciones = [
                         [1, 0], [-1, 0], [0, 1], [0, -1]
                     ];
-
-                    // buscar direcciones válidas
-                    for (const [dx, dy] of dirs) {
+                    const opciones = [];
+                    for (const [dx, dy] of direcciones) {
                         const nx = e.x + dx, ny = e.y + dy;
-                        if (nx > 0 && ny > 0 && nx < columnas - 1 && ny < filas - 1 && mapa[ny][nx] === 0) {
-                            caminos.push({ x: nx, y: ny });
+                        if (nx >= 0 && ny >= 0 && nx < columnas && ny < filas && mapa[ny][nx] === 0) {
+                            opciones.push({ x: nx, y: ny });
                         }
                     }
-
-                    if (caminos.length > 0) {
-                        const move = caminos[Math.floor(Math.random() * caminos.length)];
+                    if (opciones.length > 0) {
+                        const move = opciones[Math.floor(Math.random() * opciones.length)];
                         e.x = move.x;
                         e.y = move.y;
                     }
@@ -209,7 +216,7 @@
             dibujarLaberinto();
         }
 
-        // ✅ Línea de visión con límite de distancia
+        // Línea de visión limitada
         function lineaVision(enemigo, jugador) {
             const dist = Math.abs(enemigo.x - jugador.x) + Math.abs(enemigo.y - jugador.y);
             if (dist > 7) return false;
@@ -268,6 +275,7 @@
         dibujarLaberinto();
         setInterval(moverEnemigos, 600);
     </script>
+
 </body>
 
 </html>
