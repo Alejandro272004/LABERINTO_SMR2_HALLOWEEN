@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laberinto Dinámico con Enemigos, Portales y Trampas</title>
+    <title>Laberinto Dinámico con Enemigos y Trampas</title>
     <style>
         body {
             background: #0f172a;
@@ -53,18 +53,6 @@
             box-shadow: 0 0 10px #ff0000;
         }
 
-        .portalA {
-            background: #9b5de5;
-            border-radius: 50%;
-            box-shadow: 0 0 15px #c77dff;
-        }
-
-        .portalB {
-            background: #00f5d4;
-            border-radius: 50%;
-            box-shadow: 0 0 15px #00f5d4;
-        }
-
         .trampa {
             background: #ffdd00;
             border-radius: 3px;
@@ -74,7 +62,7 @@
 </head>
 
 <body>
-    <h2>🏃 ¡Escapa del laberinto con portales y trampas! 🌀</h2>
+    <h2>🏃 ¡Escapa del laberinto con trampas! 🛑</h2>
     <p>Usa las flechas. Pulsa Espacio para colocar trampas. Los monstruos te perseguirán si te ven.</p>
     <div id="laberinto"></div>
 
@@ -85,8 +73,6 @@
         let mapa = [];
         let jugador = { x: 1, y: 1 };
         let enemigos = [];
-        let portalA = null;
-        let portalB = null;
         let trampas = [];
         let maxTrampas = 3;
 
@@ -109,18 +95,6 @@
             mapa[filas - 2][columnas - 2] = 2;
         }
 
-        // ---------- generar portales ----------
-        function generarPortales() {
-            let libres = [];
-            for (let y = 1; y < filas - 1; y++) {
-                for (let x = 1; x < columnas - 1; x++) {
-                    if (mapa[y][x] === 0) libres.push({ x, y });
-                }
-            }
-            portalA = libres.splice(Math.floor(Math.random() * libres.length), 1)[0];
-            portalB = libres.splice(Math.floor(Math.random() * libres.length), 1)[0];
-        }
-
         // ---------- dibujar laberinto ----------
         function dibujarLaberinto() {
             laberinto.innerHTML = '';
@@ -130,8 +104,6 @@
                     celda.className = 'celda';
                     if (mapa[y][x] === 1) celda.classList.add('pared');
                     if (mapa[y][x] === 2) celda.classList.add('meta');
-                    if (portalA && x === portalA.x && y === portalA.y) celda.classList.add('portalA');
-                    if (portalB && x === portalB.x && y === portalB.y) celda.classList.add('portalB');
                     for (const t of trampas) {
                         if (t.x === x && t.y === y) celda.classList.add('trampa');
                     }
@@ -151,10 +123,6 @@
             if (mapa[ny][nx] === 1) return;
             jugador.x = nx; jugador.y = ny;
 
-            // Portales
-            if (portalA && jugador.x === portalA.x && jugador.y === portalA.y) { jugador.x = portalB.x; jugador.y = portalB.y; }
-            if (portalB && jugador.x === portalB.x && jugador.y === portalB.y) { jugador.x = portalA.x; jugador.y = portalA.y; }
-
             if (mapa[ny][nx] === 2) { alert('🎉 ¡Has ganado!'); reiniciar(); }
 
             verificarColision();
@@ -165,8 +133,6 @@
         function colocarTrampa() {
             if (trampas.length >= maxTrampas) return;
             const ocupado = mapa[jugador.y][jugador.x] === 1 ||
-                (portalA && jugador.x === portalA.x && jugador.y === portalA.y) ||
-                (portalB && jugador.x === portalB.x && jugador.y === portalB.y) ||
                 enemigos.some(e => e.x === jugador.x && e.y === jugador.y) ||
                 trampas.some(t => t.x === jugador.x && t.y === jugador.y);
             if (ocupado) return;
@@ -300,10 +266,6 @@
                     e.state = 'idle';
                 }
 
-                // Portales
-                if (portalA && e.x === portalA.x && e.y === portalA.y) { e.x = portalB.x; e.y = portalB.y; }
-                if (portalB && e.x === portalB.x && e.y === portalB.y) { e.x = portalA.x; e.y = portalA.y; }
-
                 // Trampas
                 for (let i = trampas.length - 1; i >= 0; i--) {
                     const t = trampas[i];
@@ -329,7 +291,6 @@
             generarLaberinto();
             jugador = { x: 1, y: 1 };
             generarEnemigos(4);
-            generarPortales();
             trampas = [];
             dibujarLaberinto();
         }
@@ -346,7 +307,6 @@
         // ---------- inicialización ----------
         generarLaberinto();
         generarEnemigos(4);
-        generarPortales();
         dibujarLaberinto();
         setInterval(moverEnemigos, 500);
     </script>
