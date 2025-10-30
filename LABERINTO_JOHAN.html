@@ -19,8 +19,8 @@
 
         #laberinto {
             display: grid;
-            grid-template-columns: repeat(20, 30px);
-            grid-template-rows: repeat(20, 30px);
+            grid-template-columns: repeat(21, 30px);
+            grid-template-rows: repeat(21, 30px);
             gap: 2px;
             margin-top: 20px;
         }
@@ -61,31 +61,41 @@
     <div id="laberinto"></div>
 
     <script>
-        const filas = 20;
-        const columnas = 20;
+        const filas = 21;
+        const columnas = 21;
         const laberinto = document.getElementById('laberinto');
         let mapa = [];
         let jugador = { x: 1, y: 1 };
         let enemigos = [];
 
-        // Generar laberinto aleatorio (más abierto)
+        // Crear laberinto real usando DFS
         function generarLaberinto() {
-            mapa = [];
-            for (let y = 0; y < filas; y++) {
-                let fila = [];
-                for (let x = 0; x < columnas; x++) {
-                    // Borde siempre pared
-                    if (x === 0 || y === 0 || x === columnas - 1 || y === filas - 1) {
-                        fila.push(1);
-                    } else {
-                        // Menos paredes (15%)
-                        fila.push(Math.random() < 0.15 ? 1 : 0);
+            mapa = Array.from({ length: filas }, () => Array(columnas).fill(1));
+
+            function tallar(x, y) {
+                const dirs = [
+                    [2, 0],
+                    [-2, 0],
+                    [0, 2],
+                    [0, -2]
+                ].sort(() => Math.random() - 0.5);
+
+                for (const [dx, dy] of dirs) {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx > 0 && ny > 0 && nx < columnas - 1 && ny < filas - 1 && mapa[ny][nx] === 1) {
+                        mapa[ny - dy / 2][nx - dx / 2] = 0;
+                        mapa[ny][nx] = 0;
+                        tallar(nx, ny);
                     }
                 }
-                mapa.push(fila);
             }
-            mapa[1][1] = 0; // inicio
-            mapa[filas - 2][columnas - 2] = 2; // meta
+
+            // Empezar desde (1,1)
+            mapa[1][1] = 0;
+            tallar(1, 1);
+
+            // Dejar la meta al otro lado
+            mapa[filas - 2][columnas - 2] = 2;
         }
 
         // Dibujar laberinto y enemigos
@@ -115,7 +125,6 @@
             jugador.x = nx;
             jugador.y = ny;
 
-            // Ganar
             if (mapa[ny][nx] === 2) {
                 alert('🎉 ¡Has ganado!');
                 reiniciar();
@@ -204,8 +213,10 @@
             dibujarLaberinto();
         }
 
-        // Línea de visión
+        // Línea de visión (misma distancia, pero dentro de 6 casillas máximo)
         function lineaVision(enemigo, jugador) {
+            const dist = Math.abs(enemigo.x - jugador.x) + Math.abs(enemigo.y - jugador.y);
+            if (dist > 6) return false; // solo ve si está cerca
             if (enemigo.x === jugador.x) {
                 const minY = Math.min(enemigo.y, jugador.y);
                 const maxY = Math.max(enemigo.y, jugador.y);
@@ -263,7 +274,7 @@
         generarLaberinto();
         generarEnemigos(4);
         dibujarLaberinto();
-        setInterval(moverEnemigos, 600); // Enemigos más lentos
+        setInterval(moverEnemigos, 600);
     </script>
 </body>
 
