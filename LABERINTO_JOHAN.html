@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laberinto con Enemigos que Persiguen</title>
+    <title>Laberinto con Enemigos IA</title>
     <style>
         body {
             background: #0f172a;
@@ -52,7 +52,7 @@
 
 <body>
     <h2>🏃 ¡Escapa del laberinto!</h2>
-    <p>Usa las flechas para moverte. Si un enemigo te alcanza, pierdes.</p>
+    <p>Usa las flechas para moverte. Los enemigos te perseguirán si te ven.</p>
 
     <div id="laberinto"></div>
 
@@ -62,16 +62,17 @@
         const laberinto = document.getElementById('laberinto');
 
         let mapa = [];
-
         let jugador = { x: 1, y: 1 };
         let enemigos = [];
         let intervaloMovimiento;
 
-        // Generar laberinto aleatorio
+        // Generar laberinto con backtracking
         function generarLaberinto(filas, columnas) {
             const grid = Array.from({ length: filas }, () => Array(columnas).fill(1));
+
             function esValido(f, c) { return f > 0 && f < filas - 1 && c > 0 && c < columnas - 1; }
             function mezclar(arr) { return arr.sort(() => Math.random() - 0.5); }
+
             function tallar(f, c) {
                 grid[f][c] = 0;
                 const dirs = mezclar([[1, 0], [-1, 0], [0, 1], [0, -1]]);
@@ -84,14 +85,39 @@
                     }
                 }
             }
+
             tallar(1, 1);
             grid[filas - 2][columnas - 2] = 2; // meta
             return grid;
         }
 
-        mapa = generarLaberinto(filas, columnas);
+        // Verificar si hay camino con BFS
+        function hayCamino(mapa, startX, startY, endX, endY) {
+            const visitado = Array.from({ length: filas }, () => Array(columnas).fill(false));
+            const cola = [[startX, startY]];
+            const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+            visitado[startY][startX] = true;
 
-        // Generar enemigos aleatorios
+            while (cola.length) {
+                const [x, y] = cola.shift();
+                if (x === endX && y === endY) return true;
+                for (const [dx, dy] of dirs) {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && ny >= 0 && nx < columnas && ny < filas && !visitado[ny][nx] && mapa[ny][nx] !== 1) {
+                        visitado[ny][nx] = true;
+                        cola.push([nx, ny]);
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Generar laberinto válido
+        do {
+            mapa = generarLaberinto(filas, columnas);
+        } while (!hayCamino(mapa, 1, 1, columnas - 2, filas - 2));
+
+        // Generar enemigos
         function generarEnemigos(num) {
             const lista = [];
             for (let i = 0; i < num; i++) {
@@ -99,7 +125,7 @@
                 do {
                     x = Math.floor(Math.random() * columnas);
                     y = Math.floor(Math.random() * filas);
-                } while (mapa[y][x] !== 0 || (x === 1 && y === 1));
+                } while (mapa[y][x] !== 0 || (x === 1 && y === 1) || (x === columnas - 2 && y === filas - 2));
                 lista.push({ x, y });
             }
             return lista;
@@ -125,7 +151,7 @@
             }
         }
 
-        // Movimiento del jugador
+        // Movimiento jugador
         function moverJugador(dx, dy) {
             const nuevoX = jugador.x + dx;
             const nuevoY = jugador.y + dy;
@@ -143,40 +169,100 @@
             dibujarLaberinto();
         }
 
-        // Movimiento simple de enemigos hacia el jugador
-        function moverEnemigos() {
-            for (const e of enemigos) {
-                let mejorX = e.x;
-                let mejorY = e.y;
-                const opciones = [
-                    { x: e.x + 1, y: e.y },
-                    { x: e.x - 1, y: e.y },
-                    { x: e.x, y: e.y + 1 },
-                    { x: e.x, y: e.y - 1 },
-                ];
+        // A* Pathfinding
+        function astar(start, goal) {
+            const openSet = [start];
+            const cameFrom = {};
+            const gScore = {};
+            const fScore = {};
 
-                // Elegir movimiento que acerque al jugador
-                let menorDist = Infinity;
-                for (const o of opciones) {
-                    if (o.x >= 0 && o.y >= 0 && o.x < columnas && o.y < filas && mapa[o.y][o.x] !== 1) {
-                        const dist = Math.hypot(jugador.x - o.x, jugador.y - o.y);
-                        if (dist < menorDist) {
-                            menorDist = dist;
-                            mejorX = o.x;
-                            mejorY = o.y;
-                        }
+            function hash(p) { return `${p.x},${p.y}`; }
+
+            gScore[hash(start)] = 0;
+            fScore[hash(start)] = heuristica(start, goal);
+
+            while (openSet.length) {
+                // Sacar el nodo con menor fScore
+                let currentIdx = 0;
+                for (let i = 1; i < openSet.length; i++) {
+                    if (fScore[hash(openSet[i])] < fScore[hash(openSet[currentIdx])]) currentIdx = i;
+                }
+                const current = openSet.splice(currentIdx, 1)[0];
+
+                if (current.x === goal.x && current.y === goal.y) {
+                    // Reconstruir camino
+                    const path = [];
+                    let temp = current;
+                    while (hash(temp) in cameFrom) {
+                        path.push(temp);
+                        temp = cameFrom[hash(temp)];
                     }
+                    path.reverse();
+                    return path;
                 }
 
-                e.x = mejorX;
-                e.y = mejorY;
-            }
+                const vecinos = [
+                    { x: current.x + 1, y: current.y },
+                    { x: current.x - 1, y: current.y },
+                    { x: current.x, y: current.y + 1 },
+                    { x: current.x, y: current.y - 1 }
+                ];
 
+                for (const v of vecinos) {
+                    if (v.x < 0 || v.y < 0 || v.x >= columnas || v.y >= filas) continue;
+                    if (mapa[v.y][v.x] === 1) continue;
+                    const tentative_g = gScore[hash(current)] + 1;
+                    if (tentative_g < (gScore[hash(v)] || Infinity)) {
+                        cameFrom[hash(v)] = current;
+                        gScore[hash(v)] = tentative_g;
+                        fScore[hash(v)] = tentative_g + heuristica(v, goal);
+                        if (!openSet.some(p => p.x === v.x && p.y === v.y)) openSet.push(v);
+                    }
+                }
+            }
+            return []; // No hay camino
+        }
+
+        function heuristica(a, b) {
+            return Math.abs(a.x - b.x) + Math.abs(a.y - b.y); // Manhattan
+        }
+
+        // Movimiento IA de enemigos
+        function moverEnemigosIA() {
+            for (const e of enemigos) {
+                // Detecta al jugador si está en rango (línea recta sin pared)
+                if (lineaVision(e, jugador)) {
+                    const camino = astar(e, jugador);
+                    if (camino.length > 0) {
+                        e.x = camino[0].x;
+                        e.y = camino[0].y;
+                    }
+                }
+            }
             verificarColision();
             dibujarLaberinto();
         }
 
-        // Verificar si algún enemigo alcanzó al jugador
+        // Línea de visión simple (horizontal/vertical sin paredes)
+        function lineaVision(enemigo, jugador) {
+            if (enemigo.x === jugador.x) {
+                const minY = Math.min(enemigo.y, jugador.y);
+                const maxY = Math.max(enemigo.y, jugador.y);
+                for (let y = minY + 1; y < maxY; y++) {
+                    if (mapa[y][enemigo.x] === 1) return false;
+                }
+                return true;
+            } else if (enemigo.y === jugador.y) {
+                const minX = Math.min(enemigo.x, jugador.x);
+                const maxX = Math.max(enemigo.x, jugador.x);
+                for (let x = minX + 1; x < maxX; x++) {
+                    if (mapa[enemigo.y][x] === 1) return false;
+                }
+                return true;
+            }
+            return false;
+        }
+
         function verificarColision() {
             for (const e of enemigos) {
                 if (e.x === jugador.x && e.y === jugador.y) {
@@ -189,10 +275,12 @@
         function reiniciar() {
             jugador = { x: 1, y: 1 };
             enemigos = generarEnemigos(5);
+            do {
+                mapa = generarLaberinto(filas, columnas);
+            } while (!hayCamino(mapa, 1, 1, columnas - 2, filas - 2));
             dibujarLaberinto();
         }
 
-        // Controles
         document.addEventListener('keydown', e => {
             if (e.key === 'ArrowUp') moverJugador(0, -1);
             if (e.key === 'ArrowDown') moverJugador(0, 1);
@@ -200,8 +288,7 @@
             if (e.key === 'ArrowRight') moverJugador(1, 0);
         });
 
-        // Bucle de movimiento de enemigos
-        intervaloMovimiento = setInterval(moverEnemigos, 600);
+        intervaloMovimiento = setInterval(moverEnemigosIA, 400);
 
         dibujarLaberinto();
     </script>
