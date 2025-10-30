@@ -317,15 +317,18 @@
         dibujarLaberinto();
         actualizarPosiciones();
         colocarMeta();
-        iniciarTemporizador();
+        // <-- NOTA: aquí **NO** llamamos a iniciarTemporizador() inmediatamente,
+        // lo dejamos para que el bloque de abajo (load) lo haga con la lógica de intentos.
     </script>
 
-    <!-- 🔥 BLOQUE AÑADIDO SIN CAMBIAR NADA DE TU CÓDIGO -->
+    <!-- 🔥 BLOQUE AÑADIDO SIN CAMBIAR NADA DE TU CÓDIGO (solo gestión de intentos persistente) -->
     <script>
         // ✅ Bloque mejorado con localStorage (mantiene los intentos tras reiniciar)
-        let intentos = parseInt(localStorage.getItem("intentos")) || 0;
+        let intentos = parseInt(localStorage.getItem("intentos"), 10);
+        if (isNaN(intentos)) intentos = 0;
 
         window.addEventListener('load', () => {
+            // Aseguramos que no haya otro intervalo corriendo
             clearInterval(intervaloTiempo);
 
             if (intentos === 0) tiempoRestante = 30;
