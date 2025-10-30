@@ -18,7 +18,7 @@
         const DWALL_HITS = 3;             // Golpes para romper un muro destructible
         const TRAP_HINTS = true;          // Mostrar indicios sutiles de trampas
         const TRAP_HINT_RADIUS = 2;       // Radio (Manhattan) para mostrar indicio cerca del jugador
-        const TIMER_DURATION = 20;       // 3 minutos en segundos (180)
+        const TIMER_DURATION = 180;       // 3 minutos en segundos (180)
 
         // Utilidades básicas
         const inBounds = (r, c) => r >= 0 && c >= 0 && r < ROWS && c < COLS;
@@ -117,10 +117,6 @@
                 this.audioInitialized = false;
                 this._audioCtx = null;
 
-                // Variables de control de movimiento
-                this.lastMoveTime = 0;
-                this.moveDelay = 150; // 150ms entre movimientos (ajustable)
-
                 this.#initDOMGrid();
                 this.#initAudio();
                 this.reset();
@@ -136,9 +132,6 @@
                 this.destructWalls.clear();
                 this.traps = [];
                 this.#setMessage("", true);
-
-                // Resetear control de movimiento
-                this.lastMoveTime = 0;
 
                 // Reiniciar temporizador
                 this.timeLeft = TIMER_DURATION;
@@ -268,19 +261,6 @@
                         console.error('❌ Error cargando death.mp3:', e);
                     });
                 }
-                if (this.jumpscareSfx) {
-                    this.jumpscareSfx.volume = 1.0; // Volumen alto para el jumpscare
-                    this.jumpscareSfx.preload = 'auto';
-                    this.jumpscareSfx.load();
-
-                    // Listener para debug
-                    this.jumpscareSfx.addEventListener('canplaythrough', () => {
-                        console.log('✅ jumpscare.mp3 cargado completamente');
-                    });
-                    this.jumpscareSfx.addEventListener('error', (e) => {
-                        console.error('❌ Error cargando jumpscare.mp3:', e);
-                    });
-                }
 
                 // Crear contexto de audio para fallbacks
                 try {
@@ -306,7 +286,7 @@
                 }
 
                 // Intentar reproducir silencio en cada elemento de audio para habilitarlos
-                [this.killSfx, this.pickupSfx, this.deathSfx, this.jumpscareSfx].forEach(audio => {
+                [this.killSfx, this.pickupSfx, this.deathSfx].forEach(audio => {
                     if (audio) {
                         const originalVolume = audio.volume;
                         audio.volume = 0;
@@ -340,9 +320,6 @@
                 if (this.deathSfx) {
                     console.log(`  death.mp3: readyState=${this.deathSfx.readyState}, networkState=${this.deathSfx.networkState}, error=${this.deathSfx.error}`);
                 }
-                if (this.jumpscareSfx) {
-                    console.log(`  jumpscare.mp3: readyState=${this.jumpscareSfx.readyState}, networkState=${this.jumpscareSfx.networkState}, error=${this.jumpscareSfx.error}`);
-                }
             }
 
             // NUEVO SISTEMA DE MOVIMIENTO DEL JUGADOR
@@ -363,13 +340,6 @@
                     // Si el juego terminó, no hacer nada
                     if (this.gameOver) return;
 
-                    // Control de velocidad de movimiento - evitar spam
-                    const currentTime = Date.now();
-                    if (currentTime - this.lastMoveTime < this.moveDelay) {
-                        e.preventDefault();
-                        return; // Ignorar si es demasiado rápido
-                    }
-
                     // Obtener dirección del movimiento
                     console.log(`🎮 Tecla presionada: "${e.key}"`);
                     const direction = getDirection(e.key);
@@ -380,9 +350,6 @@
 
                     console.log(`🎯 Dirección detectada: ${direction.name} (${direction.dr}, ${direction.dc})`);
                     e.preventDefault();
-                    
-                    // Actualizar tiempo del último movimiento
-                    this.lastMoveTime = currentTime;
                     // Intentar mover jugador
                     const moved = this.#movePlayer(direction.dr, direction.dc);
                     if (moved || this._consumedTurn) {
@@ -998,23 +965,6 @@
                 }, 1500);
             }
 
-            // Muestra un jumpscare aterrador cuando se acaba el tiempo
-            #showJumpscare() {
-                if (!this.jumpscareOverlay) return;
-                console.log('🎃 Activando jumpscare por tiempo agotado');
-                
-                // Mostrar jumpscare inmediatamente
-                this.jumpscareOverlay.classList.add('visible');
-                
-                // Reproducir sonido de jumpscare
-                this.#playJumpscareSfx();
-                
-                // Ocultar después de 3 segundos
-                setTimeout(() => {
-                    this.jumpscareOverlay.classList.remove('visible');
-                }, 3000);
-            }
-
             // Reproduce el sonido de "kill" si existe; si falla, usa un beep corto con WebAudio
             #playKillSfx() {
                 console.log('🔊 Intentando reproducir sonido de muerte enemigo');
@@ -1111,37 +1061,6 @@
                 this.#beepFallback(140, 0.25, 0.14, 'sawtooth');
             }
 
-            // Reproduce el sonido de jumpscare cuando se acaba el tiempo
-            #playJumpscareSfx() {
-                console.log('🔊 Intentando reproducir sonido de jumpscare');
-
-                if (this.jumpscareSfx) {
-                    try {
-                        this.jumpscareSfx.currentTime = 0;
-                        const playPromise = this.jumpscareSfx.play();
-                        if (playPromise && typeof playPromise.then === 'function') {
-                            playPromise.then(() => {
-                                console.log('✅ Sonido de jumpscare reproducido');
-                            }).catch((error) => {
-                                console.warn('⚠️ Error reproduciendo jumpscare.mp3:', error.message);
-                                this.#beepFallback(100, 0.8, 0.3, 'sawtooth');
-                            });
-                            return;
-                        } else {
-                            console.log('✅ Sonido de jumpscare iniciado (sin promise)');
-                            return;
-                        }
-                    } catch (error) {
-                        console.warn('⚠️ Error directo con jumpscare.mp3:', error.message);
-                    }
-                } else {
-                    console.error('❌ Elemento jumpscare.mp3 no encontrado');
-                }
-
-                // Fallback: sonido aterrador con WebAudio
-                this.#beepFallback(100, 0.8, 0.3, 'sawtooth');
-            }
-
             // Beep de emergencia muy corto (fallback si no hay archivo o está bloqueado)
             #beepFallback(freq = 220, duration = 0.15, gainStart = 0.12, type = 'square') {
                 try {
@@ -1217,16 +1136,69 @@
             #onTimerExpired() {
                 this.#stopTimer();
                 this.gameOver = true;
-                this.#playDeathSfx();
+                
+                // ¡JUMPSCARE CUANDO SE ACABA EL TIEMPO!
+                this.#showJumpscare();
 
                 // Aplicar animación de muerte por tiempo
                 this.cells[this.player.r][this.player.c].classList.add("dying");
-                this.#setMessage("⏰ ¡Se acabó el tiempo! Pulsa R para reiniciar.", false);
+                
+                // Mostrar mensaje después del jumpscare
+                setTimeout(() => {
+                    this.#setMessage("⏰ ¡Se acabó el tiempo! Pulsa R para reiniciar.", false);
+                }, 3000);
 
                 // Remover las clases después de la animación
                 setTimeout(() => {
                     this.cells[this.player.r][this.player.c].classList.remove("player", "armed", "dying");
                 }, 800);
+            }
+
+            // Muestra un jumpscare aterrador cuando se acaba el tiempo
+            #showJumpscare() {
+                if (!this.jumpscareOverlay) return;
+                console.log('🎃 ¡JUMPSCARE ACTIVADO!');
+                
+                // Mostrar jumpscare inmediatamente
+                this.jumpscareOverlay.classList.add('visible');
+                
+                // Reproducir sonido de jumpscare
+                this.#playJumpscareSfx();
+                
+                // Ocultar después de 3 segundos
+                setTimeout(() => {
+                    this.jumpscareOverlay.classList.remove('visible');
+                    console.log('👻 Jumpscare terminado');
+                }, 3000);
+            }
+
+            // Reproduce el sonido de jumpscare
+            #playJumpscareSfx() {
+                console.log('🔊 Reproduciendo sonido de jumpscare');
+
+                if (this.jumpscareSfx) {
+                    try {
+                        this.jumpscareSfx.currentTime = 0;
+                        this.jumpscareSfx.volume = 1.0; // Volumen alto
+                        const playPromise = this.jumpscareSfx.play();
+                        if (playPromise && typeof playPromise.then === 'function') {
+                            playPromise.then(() => {
+                                console.log('✅ Sonido de jumpscare reproducido');
+                            }).catch((error) => {
+                                console.warn('⚠️ Error reproduciendo jumpscare.mp3:', error.message);
+                                // Fallback: sonido aterrador
+                                this.#beepFallback(80, 1.5, 0.5, 'sawtooth');
+                            });
+                        }
+                    } catch (error) {
+                        console.warn('⚠️ Error con jumpscare.mp3:', error.message);
+                        this.#beepFallback(80, 1.5, 0.5, 'sawtooth');
+                    }
+                } else {
+                    console.error('❌ jumpscare.mp3 no encontrado');
+                    // Fallback: sonido aterrador
+                    this.#beepFallback(80, 1.5, 0.5, 'sawtooth');
+                }
             }
         }
 
@@ -1314,15 +1286,8 @@
             opacity: 1;
         }
 
-        /* Imagen de jumpscare (puedes cambiar la ruta) */
-        #jumpscare-overlay::before {
-            content: '';
-            width: 80vw;
-            height: 80vh;
-            background: center / contain no-repeat url("img/jumpscare.png");
-            /* Fallback con imagen de emergencia si no tienes jumpscare.png */
-            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23000'/><g fill='%23ff0000' font-family='Arial' font-size='60' text-anchor='middle'><text x='100' y='80'>💀</text><text x='100' y='140' font-size='20' fill='%23fff'>¡TIEMPO AGOTADO!</text></g></svg>");
-            animation: jumpscare-shake 0.3s ease-in-out infinite;
+        #jumpscare-img {
+            animation: jumpscare-shake 0.2s ease-in-out infinite;
         }
 
         @keyframes jumpscare-shake {
@@ -1330,13 +1295,13 @@
                 transform: translate(0, 0) scale(1);
             }
             25% {
-                transform: translate(-5px, -5px) scale(1.02);
+                transform: translate(-3px, -3px) scale(1.02);
             }
             50% {
-                transform: translate(5px, -5px) scale(0.98);
+                transform: translate(3px, -3px) scale(0.98);
             }
             75% {
-                transform: translate(-5px, 5px) scale(1.02);
+                transform: translate(-3px, 3px) scale(1.02);
             }
         }
 
@@ -1633,43 +1598,7 @@
         }
 
         /* 🔹 Luces suaves al pasar o moverse */
-        .player,<!DOCTYPE html>
-<html lang="es">
-
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Laberinto</title>
-    <script>
-        const ROWS = 24;
-        const COLS = 24;
-        const MONSTER_COUNT = 3;          // Enemigos iniciales
-        const DAGGER_COUNT = 3;           // Puñales iniciales
-        const TARGET_KILLS = 3;           // Enemigos a eliminar para abrir la salida
-        const DAGGER_SPAWN_CHANCE = 0.15; // 15% de probabilidad de que aparezca un puñal al matar
-        const OBSTACLE_DENSITY = 0.45;    // 45% muros para más dificultad
-        const TRAP_COUNT = 8;             // Número de trampas/minas ocultas (aumentado)
-        const TRAP_AGGRO_TURNS = 10;      // Turnos que los enemigos se acercan tras trampa
-        const DWALL_HITS = 3;             // Golpes para romper un muro destructible
-        const TRAP_HINTS = true;          // Mostrar indicios sutiles de trampas
-        const TRAP_HINT_RADIUS = 2;       // Radio (Manhattan) para mostrar indicio cerca del jugador
-        const TIMER_DURATION = 180;       // 3 minutos en segundos (180)
-
-        // Utilidades básicas
-        const inBounds = (r, c) => r >= 0 && c >= 0 && r < ROWS && c < COLS;
-
-        // Sistema de movimiento - Convierte teclas en direcciones
-        const getDirection = (key) => {
-            const directions = {
-                'ArrowUp': { dr: -1, dc: 0, name: 'ARRIBA' },
-                'w': { dr: -1, dc: 0, name: 'ARRIBA' },
-                'W': { dr: -1, dc: 0, name: 'ARRIBA' },
-                'ArrowDown': { dr: 1, dc: 0, name: 'ABAJO' },
-                's': { dr: 1, dc: 0, name: 'ABAJO' },
-                'S': { dr: 1, dc: 0, name: 'ABAJO' },
-                'ArrowLeft': { dr: 0, dc: -1, name: 'IZQUIERDA' },
-                'a': { dr: 0, dc: -1, name: 'IZQUIERDA' },
-
+        .player,
         .monster,
         .dagger,
         .goal {
@@ -1721,7 +1650,9 @@
         <!-- Overlay de sangre: puedes cambiarlo por tu PNG usando CSS o añadiendo background-image -->
         <div id="kill-overlay" aria-hidden="true"></div>
         <!-- Overlay de jumpscare cuando se acaba el tiempo -->
-        <div id="jumpscare-overlay" aria-hidden="true"></div>
+        <div id="jumpscare-overlay" aria-hidden="true">
+            <img id="jumpscare-img" src="jumpscare.png" alt="Jumpscare" style="max-width: 80vw; max-height: 80vh; object-fit: contain;">
+        </div>
         <!-- Sonido al matar enemigo: coloca tu archivo en img/kill.mp3 o cambia la ruta -->
         <audio id="kill-sfx" src="img/kill.mp3" preload="auto" crossorigin="anonymous"></audio>
         <!-- Sonido al recoger puñal -->
@@ -1729,9 +1660,8 @@
         <!-- Sonido al morir el jugador -->
         <audio id="death-sfx" src="img/death.mp3" preload="auto" crossorigin="anonymous"></audio>
         <!-- Sonido de jumpscare -->
-        <audio id="jumpscare-sfx" src="img/jumpscare.mp3" preload="auto" crossorigin="anonymous"></audio>
+        <audio id="jumpscare-sfx" src="jumpscare.mp3" preload="auto" crossorigin="anonymous"></audio>
     </main>
 </body>
 
 </html>
-
