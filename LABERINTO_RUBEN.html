@@ -91,9 +91,11 @@
                 this.messageEl = document.getElementById("message");
                 this.timerEl = document.getElementById("timer");
                 this.killOverlay = document.getElementById("kill-overlay");
+                this.jumpscareOverlay = document.getElementById("jumpscare-overlay");
                 this.killSfx = document.getElementById("kill-sfx");
                 this.pickupSfx = document.getElementById("pickup-sfx");
                 this.deathSfx = document.getElementById("death-sfx");
+                this.jumpscareSfx = document.getElementById("jumpscare-sfx");
                 this._consumedTurn = false;        // Marca si una acción sin movimiento consume turno
                 this.aggroTurns = 0;               // Turnos de aggro global tras trampa
                 this.destructWalls = new Map();    // key -> golpesRestantes
@@ -266,6 +268,19 @@
                         console.error('❌ Error cargando death.mp3:', e);
                     });
                 }
+                if (this.jumpscareSfx) {
+                    this.jumpscareSfx.volume = 1.0; // Volumen alto para el jumpscare
+                    this.jumpscareSfx.preload = 'auto';
+                    this.jumpscareSfx.load();
+
+                    // Listener para debug
+                    this.jumpscareSfx.addEventListener('canplaythrough', () => {
+                        console.log('✅ jumpscare.mp3 cargado completamente');
+                    });
+                    this.jumpscareSfx.addEventListener('error', (e) => {
+                        console.error('❌ Error cargando jumpscare.mp3:', e);
+                    });
+                }
 
                 // Crear contexto de audio para fallbacks
                 try {
@@ -291,7 +306,7 @@
                 }
 
                 // Intentar reproducir silencio en cada elemento de audio para habilitarlos
-                [this.killSfx, this.pickupSfx, this.deathSfx].forEach(audio => {
+                [this.killSfx, this.pickupSfx, this.deathSfx, this.jumpscareSfx].forEach(audio => {
                     if (audio) {
                         const originalVolume = audio.volume;
                         audio.volume = 0;
@@ -324,6 +339,9 @@
                 }
                 if (this.deathSfx) {
                     console.log(`  death.mp3: readyState=${this.deathSfx.readyState}, networkState=${this.deathSfx.networkState}, error=${this.deathSfx.error}`);
+                }
+                if (this.jumpscareSfx) {
+                    console.log(`  jumpscare.mp3: readyState=${this.jumpscareSfx.readyState}, networkState=${this.jumpscareSfx.networkState}, error=${this.jumpscareSfx.error}`);
                 }
             }
 
@@ -980,6 +998,23 @@
                 }, 1500);
             }
 
+            // Muestra un jumpscare aterrador cuando se acaba el tiempo
+            #showJumpscare() {
+                if (!this.jumpscareOverlay) return;
+                console.log('🎃 Activando jumpscare por tiempo agotado');
+                
+                // Mostrar jumpscare inmediatamente
+                this.jumpscareOverlay.classList.add('visible');
+                
+                // Reproducir sonido de jumpscare
+                this.#playJumpscareSfx();
+                
+                // Ocultar después de 3 segundos
+                setTimeout(() => {
+                    this.jumpscareOverlay.classList.remove('visible');
+                }, 3000);
+            }
+
             // Reproduce el sonido de "kill" si existe; si falla, usa un beep corto con WebAudio
             #playKillSfx() {
                 console.log('🔊 Intentando reproducir sonido de muerte enemigo');
@@ -1074,6 +1109,37 @@
                 }
 
                 this.#beepFallback(140, 0.25, 0.14, 'sawtooth');
+            }
+
+            // Reproduce el sonido de jumpscare cuando se acaba el tiempo
+            #playJumpscareSfx() {
+                console.log('🔊 Intentando reproducir sonido de jumpscare');
+
+                if (this.jumpscareSfx) {
+                    try {
+                        this.jumpscareSfx.currentTime = 0;
+                        const playPromise = this.jumpscareSfx.play();
+                        if (playPromise && typeof playPromise.then === 'function') {
+                            playPromise.then(() => {
+                                console.log('✅ Sonido de jumpscare reproducido');
+                            }).catch((error) => {
+                                console.warn('⚠️ Error reproduciendo jumpscare.mp3:', error.message);
+                                this.#beepFallback(100, 0.8, 0.3, 'sawtooth');
+                            });
+                            return;
+                        } else {
+                            console.log('✅ Sonido de jumpscare iniciado (sin promise)');
+                            return;
+                        }
+                    } catch (error) {
+                        console.warn('⚠️ Error directo con jumpscare.mp3:', error.message);
+                    }
+                } else {
+                    console.error('❌ Elemento jumpscare.mp3 no encontrado');
+                }
+
+                // Fallback: sonido aterrador con WebAudio
+                this.#beepFallback(100, 0.8, 0.3, 'sawtooth');
             }
 
             // Beep de emergencia muy corto (fallback si no hay archivo o está bloqueado)
@@ -1228,6 +1294,50 @@
         /* Imagen de sangre personalizada (ruta local) */
         #kill-overlay {
             background-image: url("img/blood.png");
+        }
+
+        /* Overlay de jumpscare - aparecer de forma súbita */
+        #jumpscare-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 10000;
+            pointer-events: none;
+            opacity: 0;
+            background: #000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: none; /* Sin transición para que aparezca súbitamente */
+        }
+
+        #jumpscare-overlay.visible {
+            opacity: 1;
+        }
+
+        /* Imagen de jumpscare (puedes cambiar la ruta) */
+        #jumpscare-overlay::before {
+            content: '';
+            width: 80vw;
+            height: 80vh;
+            background: center / contain no-repeat url("img/jumpscare.png");
+            /* Fallback con imagen de emergencia si no tienes jumpscare.png */
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'><rect width='200' height='200' fill='%23000'/><g fill='%23ff0000' font-family='Arial' font-size='60' text-anchor='middle'><text x='100' y='80'>💀</text><text x='100' y='140' font-size='20' fill='%23fff'>¡TIEMPO AGOTADO!</text></g></svg>");
+            animation: jumpscare-shake 0.3s ease-in-out infinite;
+        }
+
+        @keyframes jumpscare-shake {
+            0%, 100% {
+                transform: translate(0, 0) scale(1);
+            }
+            25% {
+                transform: translate(-5px, -5px) scale(1.02);
+            }
+            50% {
+                transform: translate(5px, -5px) scale(0.98);
+            }
+            75% {
+                transform: translate(-5px, 5px) scale(1.02);
+            }
         }
 
         .cell {
@@ -1523,7 +1633,43 @@
         }
 
         /* 🔹 Luces suaves al pasar o moverse */
-        .player,
+        .player,<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Laberinto</title>
+    <script>
+        const ROWS = 24;
+        const COLS = 24;
+        const MONSTER_COUNT = 3;          // Enemigos iniciales
+        const DAGGER_COUNT = 3;           // Puñales iniciales
+        const TARGET_KILLS = 3;           // Enemigos a eliminar para abrir la salida
+        const DAGGER_SPAWN_CHANCE = 0.15; // 15% de probabilidad de que aparezca un puñal al matar
+        const OBSTACLE_DENSITY = 0.45;    // 45% muros para más dificultad
+        const TRAP_COUNT = 8;             // Número de trampas/minas ocultas (aumentado)
+        const TRAP_AGGRO_TURNS = 10;      // Turnos que los enemigos se acercan tras trampa
+        const DWALL_HITS = 3;             // Golpes para romper un muro destructible
+        const TRAP_HINTS = true;          // Mostrar indicios sutiles de trampas
+        const TRAP_HINT_RADIUS = 2;       // Radio (Manhattan) para mostrar indicio cerca del jugador
+        const TIMER_DURATION = 180;       // 3 minutos en segundos (180)
+
+        // Utilidades básicas
+        const inBounds = (r, c) => r >= 0 && c >= 0 && r < ROWS && c < COLS;
+
+        // Sistema de movimiento - Convierte teclas en direcciones
+        const getDirection = (key) => {
+            const directions = {
+                'ArrowUp': { dr: -1, dc: 0, name: 'ARRIBA' },
+                'w': { dr: -1, dc: 0, name: 'ARRIBA' },
+                'W': { dr: -1, dc: 0, name: 'ARRIBA' },
+                'ArrowDown': { dr: 1, dc: 0, name: 'ABAJO' },
+                's': { dr: 1, dc: 0, name: 'ABAJO' },
+                'S': { dr: 1, dc: 0, name: 'ABAJO' },
+                'ArrowLeft': { dr: 0, dc: -1, name: 'IZQUIERDA' },
+                'a': { dr: 0, dc: -1, name: 'IZQUIERDA' },
+
         .monster,
         .dagger,
         .goal {
@@ -1574,12 +1720,16 @@
         <div id="message" class="overlay" hidden></div>
         <!-- Overlay de sangre: puedes cambiarlo por tu PNG usando CSS o añadiendo background-image -->
         <div id="kill-overlay" aria-hidden="true"></div>
+        <!-- Overlay de jumpscare cuando se acaba el tiempo -->
+        <div id="jumpscare-overlay" aria-hidden="true"></div>
         <!-- Sonido al matar enemigo: coloca tu archivo en img/kill.mp3 o cambia la ruta -->
         <audio id="kill-sfx" src="img/kill.mp3" preload="auto" crossorigin="anonymous"></audio>
         <!-- Sonido al recoger puñal -->
         <audio id="pickup-sfx" src="img/pickup.mp3" preload="auto" crossorigin="anonymous"></audio>
         <!-- Sonido al morir el jugador -->
         <audio id="death-sfx" src="img/death.mp3" preload="auto" crossorigin="anonymous"></audio>
+        <!-- Sonido de jumpscare -->
+        <audio id="jumpscare-sfx" src="img/jumpscare.mp3" preload="auto" crossorigin="anonymous"></audio>
     </main>
 </body>
 
