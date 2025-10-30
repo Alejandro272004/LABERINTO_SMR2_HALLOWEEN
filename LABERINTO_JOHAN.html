@@ -4,13 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laberinto con Enemigos IA Dinámicos</title>
+    <title>Laberinto Dinámico con Enemigos</title>
     <style>
         body {
             background: #0f172a;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
             font-family: sans-serif;
             color: white;
         }
@@ -30,7 +32,7 @@
         }
 
         .pared {
-            background: #0c1426;
+            background: #0e162b;
         }
 
         .jugador {
@@ -52,246 +54,210 @@
 
 <body>
     <h2>🏃 ¡Escapa del laberinto!</h2>
-    <p>Usa las flechas para moverte. Los enemigos patrullan y te perseguirán si te ven.</p>
-
+    <p>Usa las flechas. Los monstruos te perseguirán si te ven.</p>
     <div id="laberinto"></div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const filas = 20;
-            const columnas = 20;
-            const laberinto = document.getElementById('laberinto');
+        const filas = 20;
+        const columnas = 20;
+        const laberinto = document.getElementById('laberinto');
+        let mapa = [];
+        let jugador = { x: 1, y: 1 };
+        let enemigos = [];
+        let intervaloMovimiento;
 
-            let mapa = [];
-            let jugador = { x: 1, y: 1 };
-            let enemigos = [];
-            let intervaloMovimiento;
-
-            function generarLaberinto(filas, columnas) {
-                const grid = Array.from({ length: filas }, () => Array(columnas).fill(1));
-
-                function esValido(f, c) { return f > 0 && f < filas - 1 && c > 0 && c < columnas - 1; }
-                function mezclar(arr) { return arr.sort(() => Math.random() - 0.5); }
-
-                function tallar(f, c) {
-                    grid[f][c] = 0;
-                    const dirs = mezclar([[1, 0], [-1, 0], [0, 1], [0, -1]]);
-                    for (const [df, dc] of dirs) {
-                        const nf = f + df * 2;
-                        const nc = c + dc * 2;
-                        if (esValido(nf, nc) && grid[nf][nc] === 1) {
-                            grid[f + df][c + dc] = 0;
-                            tallar(nf, nc);
-                        }
+        // Generar laberinto aleatorio
+        function generarLaberinto() {
+            mapa = [];
+            for (let y = 0; y < filas; y++) {
+                let fila = [];
+                for (let x = 0; x < columnas; x++) {
+                    // Borde siempre pared
+                    if (x === 0 || y === 0 || x === columnas - 1 || y === filas - 1) {
+                        fila.push(1);
+                    } else {
+                        fila.push(Math.random() < 0.25 ? 1 : 0); // 25% de paredes
                     }
                 }
+                mapa.push(fila);
+            }
+            mapa[1][1] = 0; // inicio
+            mapa[filas - 2][columnas - 2] = 2; // meta
+        }
 
-                tallar(1, 1);
-                grid[filas - 2][columnas - 2] = 2;
-                return grid;
+        // Dibujar laberinto y enemigos
+        function dibujarLaberinto() {
+            laberinto.innerHTML = '';
+            for (let y = 0; y < filas; y++) {
+                for (let x = 0; x < columnas; x++) {
+                    const celda = document.createElement('div');
+                    celda.classList.add('celda');
+                    if (mapa[y][x] === 1) celda.classList.add('pared');
+                    if (mapa[y][x] === 2) celda.classList.add('meta');
+                    if (x === jugador.x && y === jugador.y) celda.classList.add('jugador');
+                    for (const e of enemigos) {
+                        if (e.x === x && e.y === y) celda.classList.add('enemigo');
+                    }
+                    laberinto.appendChild(celda);
+                }
+            }
+        }
+
+        // Movimiento jugador
+        function moverJugador(dx, dy) {
+            const nx = jugador.x + dx;
+            const ny = jugador.y + dy;
+            if (nx < 0 || ny < 0 || nx >= columnas || ny >= filas) return;
+            if (mapa[ny][nx] === 1) return; // pared
+            jugador.x = nx;
+            jugador.y = ny;
+
+            // Ganar
+            if (mapa[ny][nx] === 2) {
+                alert('🎉 ¡Has ganado!');
+                reiniciar();
             }
 
-            function hayCamino(mapa, startX, startY, endX, endY) {
-                const visitado = Array.from({ length: filas }, () => Array(columnas).fill(false));
-                const cola = [[startX, startY]];
-                const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-                visitado[startY][startX] = true;
+            verificarColision();
+            dibujarLaberinto();
+        }
 
-                while (cola.length) {
-                    const [x, y] = cola.shift();
-                    if (x === endX && y === endY) return true;
-                    for (const [dx, dy] of dirs) {
-                        const nx = x + dx, ny = y + dy;
-                        if (nx >= 0 && ny >= 0 && nx < columnas && ny < filas && !visitado[ny][nx] && mapa[ny][nx] !== 1) {
-                            visitado[ny][nx] = true;
-                            cola.push([nx, ny]);
-                        }
+        // A* para enemigos
+        function astar(start, goal) {
+            const openSet = [start];
+            const cameFrom = {};
+            const gScore = {};
+            const fScore = {};
+            const hash = p => `${p.x},${p.y}`;
+            gScore[hash(start)] = 0;
+            fScore[hash(start)] = Math.abs(start.x - goal.x) + Math.abs(start.y - goal.y);
+
+            while (openSet.length) {
+                let currentIdx = 0;
+                for (let i = 1; i < openSet.length; i++) {
+                    if (fScore[hash(openSet[i])] < fScore[hash(openSet[currentIdx])]) currentIdx = i;
+                }
+                const current = openSet.splice(currentIdx, 1)[0];
+                if (current.x === goal.x && current.y === goal.y) {
+                    const path = [];
+                    let temp = current;
+                    while (hash(temp) in cameFrom) {
+                        path.push(temp);
+                        temp = cameFrom[hash(temp)];
+                    }
+                    path.reverse();
+                    return path;
+                }
+
+                const vecinos = [
+                    { x: current.x + 1, y: current.y },
+                    { x: current.x - 1, y: current.y },
+                    { x: current.x, y: current.y + 1 },
+                    { x: current.x, y: current.y - 1 }
+                ];
+
+                for (const v of vecinos) {
+                    if (v.x < 0 || v.y < 0 || v.x >= columnas || v.y >= filas) continue;
+                    if (mapa[v.y][v.x] === 1) continue;
+                    const tentative = gScore[hash(current)] + 1;
+                    if (tentative < (gScore[hash(v)] || Infinity)) {
+                        cameFrom[hash(v)] = current;
+                        gScore[hash(v)] = tentative;
+                        fScore[hash(v)] = tentative + Math.abs(v.x - goal.x) + Math.abs(v.y - goal.y);
+                        if (!openSet.some(p => p.x === v.x && p.y === v.y)) openSet.push(v);
                     }
                 }
-                return false;
             }
+            return [];
+        }
 
-            do {
-                mapa = generarLaberinto(filas, columnas);
-            } while (!hayCamino(mapa, 1, 1, columnas - 2, filas - 2));
-
-            function generarEnemigos(num) {
-                const lista = [];
-                for (let i = 0; i < num; i++) {
-                    let x, y;
-                    do {
-                        x = Math.floor(Math.random() * columnas);
-                        y = Math.floor(Math.random() * filas);
-                    } while (mapa[y][x] !== 0 || (x === 1 && y === 1) || (x === columnas - 2 && y === filas - 2));
-                    lista.push({ x, y });
+        // Enemigos se mueven
+        function moverEnemigos() {
+            for (const e of enemigos) {
+                let moved = false;
+                if (lineaVision(e, jugador)) {
+                    const camino = astar(e, jugador);
+                    if (camino.length > 0) {
+                        e.x = camino[0].x;
+                        e.y = camino[0].y;
+                        moved = true;
+                    }
                 }
-                return lista;
-            }
-
-            enemigos = generarEnemigos(5);
-
-            function dibujarLaberinto() {
-                laberinto.innerHTML = '';
-                for (let y = 0; y < filas; y++) {
-                    for (let x = 0; x < columnas; x++) {
-                        const celda = document.createElement('div');
-                        celda.classList.add('celda');
-                        if (mapa[y][x] === 1) celda.classList.add('pared');
-                        if (mapa[y][x] === 2) celda.classList.add('meta');
-                        if (x === jugador.x && y === jugador.y) celda.classList.add('jugador');
-                        for (const e of enemigos) {
-                            if (e.x === x && e.y === y) celda.classList.add('enemigo');
-                        }
-                        laberinto.appendChild(celda);
+                if (!moved) {
+                    const opciones = [
+                        { x: e.x + 1, y: e.y }, { x: e.x - 1, y: e.y }, { x: e.x, y: e.y + 1 }, { x: e.x, y: e.y - 1 }
+                    ].filter(p => p.x >= 0 && p.y >= 0 && p.x < columnas && p.y < filas && mapa[p.y][p.x] === 0);
+                    if (opciones.length > 0) {
+                        const move = opciones[Math.floor(Math.random() * opciones.length)];
+                        e.x = move.x;
+                        e.y = move.y;
                     }
                 }
             }
+            verificarColision();
+            dibujarLaberinto();
+        }
 
-            function moverJugador(dx, dy) {
-                const nuevoX = jugador.x + dx;
-                const nuevoY = jugador.y + dy;
-                if (nuevoX < 0 || nuevoY < 0 || nuevoX >= columnas || nuevoY >= filas) return;
-                if (mapa[nuevoY][nuevoX] === 1) return;
-                jugador.x = nuevoX;
-                jugador.y = nuevoY;
+        // Línea de visión
+        function lineaVision(enemigo, jugador) {
+            if (enemigo.x === jugador.x) {
+                const minY = Math.min(enemigo.y, jugador.y);
+                const maxY = Math.max(enemigo.y, jugador.y);
+                for (let y = minY + 1; y < maxY; y++) if (mapa[y][enemigo.x] === 1) return false;
+                return true;
+            } else if (enemigo.y === jugador.y) {
+                const minX = Math.min(enemigo.x, jugador.x);
+                const maxX = Math.max(enemigo.x, jugador.x);
+                for (let x = minX + 1; x < maxX; x++) if (mapa[enemigo.y][x] === 1) return false;
+                return true;
+            }
+            return false;
+        }
 
-                if (mapa[nuevoY][nuevoX] === 2) {
-                    alert("🎉 ¡Has escapado del laberinto!");
+        // Colisión jugador-enemigo
+        function verificarColision() {
+            for (const e of enemigos) {
+                if (e.x === jugador.x && e.y === jugador.y) {
+                    alert('💀 ¡Te atraparon!');
                     reiniciar();
                 }
-
-                verificarColision();
-                dibujarLaberinto();
             }
+        }
 
-            function astar(start, goal) {
-                const openSet = [start];
-                const cameFrom = {};
-                const gScore = {};
-                const fScore = {};
-                function hash(p) { return `${p.x},${p.y}`; }
-                gScore[hash(start)] = 0;
-                fScore[hash(start)] = heuristica(start, goal);
-
-                while (openSet.length) {
-                    let currentIdx = 0;
-                    for (let i = 1; i < openSet.length; i++) {
-                        if (fScore[hash(openSet[i])] < fScore[hash(openSet[currentIdx])]) currentIdx = i;
-                    }
-                    const current = openSet.splice(currentIdx, 1)[0];
-                    if (current.x === goal.x && current.y === goal.y) {
-                        const path = [];
-                        let temp = current;
-                        while (hash(temp) in cameFrom) {
-                            path.push(temp);
-                            temp = cameFrom[hash(temp)];
-                        }
-                        path.reverse();
-                        return path;
-                    }
-
-                    const vecinos = [
-                        { x: current.x + 1, y: current.y },
-                        { x: current.x - 1, y: current.y },
-                        { x: current.x, y: current.y + 1 },
-                        { x: current.x, y: current.y - 1 }
-                    ];
-
-                    for (const v of vecinos) {
-                        if (v.x < 0 || v.y < 0 || v.x >= columnas || v.y >= filas) continue;
-                        if (mapa[v.y][v.x] === 1) continue;
-                        const tentative_g = gScore[hash(current)] + 1;
-                        if (tentative_g < (gScore[hash(v)] || Infinity)) {
-                            cameFrom[hash(v)] = current;
-                            gScore[hash(v)] = tentative_g;
-                            fScore[hash(v)] = tentative_g + heuristica(v, goal);
-                            if (!openSet.some(p => p.x === v.x && p.y === v.y)) openSet.push(v);
-                        }
-                    }
-                }
-                return [];
-            }
-
-            function heuristica(a, b) {
-                return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-            }
-
-            function moverEnemigosIA() {
-                for (const e of enemigos) {
-                    let moved = false;
-                    if (lineaVision(e, jugador)) {
-                        const camino = astar(e, jugador);
-                        if (camino.length > 0) {
-                            e.x = camino[0].x;
-                            e.y = camino[0].y;
-                            moved = true;
-                        }
-                    }
-                    if (!moved) {
-                        const opciones = [
-                            { x: e.x + 1, y: e.y },
-                            { x: e.x - 1, y: e.y },
-                            { x: e.x, y: e.y + 1 },
-                            { x: e.x, y: e.y - 1 }
-                        ].filter(p => p.x >= 0 && p.y >= 0 && p.x < columnas && p.y < filas && mapa[p.y][p.x] === 0);
-                        if (opciones.length > 0) {
-                            const move = opciones[Math.floor(Math.random() * opciones.length)];
-                            e.x = move.x;
-                            e.y = move.y;
-                        }
-                    }
-                }
-                verificarColision();
-                dibujarLaberinto();
-            }
-
-            function lineaVision(enemigo, jugador) {
-                if (enemigo.x === jugador.x) {
-                    const minY = Math.min(enemigo.y, jugador.y);
-                    const maxY = Math.max(enemigo.y, jugador.y);
-                    for (let y = minY + 1; y < maxY; y++) {
-                        if (mapa[y][enemigo.x] === 1) return false;
-                    }
-                    return true;
-                } else if (enemigo.y === jugador.y) {
-                    const minX = Math.min(enemigo.x, jugador.x);
-                    const maxX = Math.max(enemigo.x, jugador.x);
-                    for (let x = minX + 1; x < maxX; x++) {
-                        if (mapa[enemigo.y][x] === 1) return false;
-                    }
-                    return true;
-                }
-                return false;
-            }
-
-            function verificarColision() {
-                for (const e of enemigos) {
-                    if (e.x === jugador.x && e.y === jugador.y) {
-                        alert("💀 ¡Te atraparon!");
-                        reiniciar();
-                    }
-                }
-            }
-
-            function reiniciar() {
-                jugador = { x: 1, y: 1 };
-                do {
-                    mapa = generarLaberinto(filas, columnas);
-                } while (!hayCamino(mapa, 1, 1, columnas - 2, filas - 2));
-                enemigos = generarEnemigos(5);
-                dibujarLaberinto();
-            }
-
-            document.addEventListener('keydown', e => {
-                if (e.key === 'ArrowUp') moverJugador(0, -1);
-                if (e.key === 'ArrowDown') moverJugador(0, 1);
-                if (e.key === 'ArrowLeft') moverJugador(-1, 0);
-                if (e.key === 'ArrowRight') moverJugador(1, 0);
-            });
-
-            intervaloMovimiento = setInterval(moverEnemigosIA, 400);
+        // Reiniciar juego
+        function reiniciar() {
+            generarLaberinto();
+            jugador = { x: 1, y: 1 };
+            generarEnemigos(5);
             dibujarLaberinto();
+        }
+
+        // Generar enemigos
+        function generarEnemigos(num) {
+            enemigos = [];
+            for (let i = 0; i < num; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * columnas);
+                    y = Math.floor(Math.random() * filas);
+                } while (mapa[y][x] !== 0 || (x === 1 && y === 1) || (x === columnas - 2 && y === filas - 2));
+                enemigos.push({ x, y });
+            }
+        }
+
+        // Controles
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowUp') moverJugador(0, -1);
+            if (e.key === 'ArrowDown') moverJugador(0, 1);
+            if (e.key === 'ArrowLeft') moverJugador(-1, 0);
+            if (e.key === 'ArrowRight') moverJugador(1, 0);
         });
+
+        // Inicialización
+        generarLaberinto();
+        generarEnemigos(5);
+        dibujarLaberinto();
+        setInterval(moverEnemigos, 400);
     </script>
 </body>
 
