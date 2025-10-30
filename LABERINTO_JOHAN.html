@@ -68,7 +68,7 @@
         let jugador = { x: 1, y: 1 };
         let enemigos = [];
 
-        // Crear laberinto real usando DFS
+        // Crear laberinto con DFS
         function generarLaberinto() {
             mapa = Array.from({ length: filas }, () => Array(columnas).fill(1));
 
@@ -90,15 +90,11 @@
                 }
             }
 
-            // Empezar desde (1,1)
             mapa[1][1] = 0;
             tallar(1, 1);
-
-            // Dejar la meta al otro lado
             mapa[filas - 2][columnas - 2] = 2;
         }
 
-        // Dibujar laberinto y enemigos
         function dibujarLaberinto() {
             laberinto.innerHTML = '';
             for (let y = 0; y < filas; y++) {
@@ -116,7 +112,6 @@
             }
         }
 
-        // Movimiento jugador
         function moverJugador(dx, dy) {
             const nx = jugador.x + dx;
             const ny = jugador.y + dy;
@@ -134,104 +129,103 @@
             dibujarLaberinto();
         }
 
-        // A* para enemigos
-        function astar(start, goal) {
-            const openSet = [start];
+        // ✅ BFS rápido (solo un paso hacia el jugador)
+        function pasoHaciaJugador(inicio, objetivo) {
+            const cola = [inicio];
             const cameFrom = {};
-            const gScore = {};
-            const fScore = {};
             const hash = p => `${p.x},${p.y}`;
-            gScore[hash(start)] = 0;
-            fScore[hash(start)] = Math.abs(start.x - goal.x) + Math.abs(start.y - goal.y);
+            cameFrom[hash(inicio)] = null;
 
-            while (openSet.length) {
-                let currentIdx = 0;
-                for (let i = 1; i < openSet.length; i++) {
-                    if (fScore[hash(openSet[i])] < fScore[hash(openSet[currentIdx])]) currentIdx = i;
-                }
-                const current = openSet.splice(currentIdx, 1)[0];
-                if (current.x === goal.x && current.y === goal.y) {
-                    const path = [];
-                    let temp = current;
-                    while (hash(temp) in cameFrom) {
-                        path.push(temp);
-                        temp = cameFrom[hash(temp)];
-                    }
-                    path.reverse();
-                    return path;
-                }
+            while (cola.length > 0) {
+                const actual = cola.shift();
+                if (actual.x === objetivo.x && actual.y === objetivo.y) break;
 
-                const vecinos = [
-                    { x: current.x + 1, y: current.y },
-                    { x: current.x - 1, y: current.y },
-                    { x: current.x, y: current.y + 1 },
-                    { x: current.x, y: current.y - 1 }
+                const dirs = [
+                    { x: actual.x + 1, y: actual.y },
+                    { x: actual.x - 1, y: actual.y },
+                    { x: actual.x, y: actual.y + 1 },
+                    { x: actual.x, y: actual.y - 1 }
                 ];
 
-                for (const v of vecinos) {
+                for (const v of dirs) {
                     if (v.x < 0 || v.y < 0 || v.x >= columnas || v.y >= filas) continue;
                     if (mapa[v.y][v.x] === 1) continue;
-                    const tentative = gScore[hash(current)] + 1;
-                    if (tentative < (gScore[hash(v)] || Infinity)) {
-                        cameFrom[hash(v)] = current;
-                        gScore[hash(v)] = tentative;
-                        fScore[hash(v)] = tentative + Math.abs(v.x - goal.x) + Math.abs(v.y - goal.y);
-                        if (!openSet.some(p => p.x === v.x && p.y === v.y)) openSet.push(v);
-                    }
+                    if (cameFrom[hash(v)]) continue;
+                    cameFrom[hash(v)] = actual;
+                    cola.push(v);
                 }
             }
-            return [];
+
+            // reconstruir solo el primer paso
+            let paso = objetivo;
+            let previo = cameFrom[hash(paso)];
+            if (!previo) return null;
+            while (previo && cameFrom[hash(previo)]) {
+                paso = previo;
+                previo = cameFrom[hash(previo)];
+            }
+            return paso;
         }
 
-        // Movimiento enemigos
+        // ✅ Movimiento enemigos mejorado
         function moverEnemigos() {
             for (const e of enemigos) {
                 let moved = false;
+
                 if (lineaVision(e, jugador)) {
-                    const camino = astar(e, jugador);
-                    if (camino.length > 0) {
-                        e.x = camino[0].x;
-                        e.y = camino[0].y;
+                    // Si ve al jugador → lo persigue un paso
+                    const paso = pasoHaciaJugador(e, jugador);
+                    if (paso) {
+                        e.x = paso.x;
+                        e.y = paso.y;
                         moved = true;
                     }
                 }
+
+                // Si no lo ve → patrulla aleatoria larga
                 if (!moved) {
-                    const opciones = [
-                        { x: e.x + 1, y: e.y },
-                        { x: e.x - 1, y: e.y },
-                        { x: e.x, y: e.y + 1 },
-                        { x: e.x, y: e.y - 1 }
-                    ].filter(p => p.x >= 0 && p.y >= 0 && p.x < columnas && p.y < filas && mapa[p.y][p.x] === 0);
-                    if (opciones.length > 0) {
-                        const move = opciones[Math.floor(Math.random() * opciones.length)];
+                    const caminos = [];
+                    const dirs = [
+                        [1, 0], [-1, 0], [0, 1], [0, -1]
+                    ];
+
+                    // buscar direcciones válidas
+                    for (const [dx, dy] of dirs) {
+                        const nx = e.x + dx, ny = e.y + dy;
+                        if (nx > 0 && ny > 0 && nx < columnas - 1 && ny < filas - 1 && mapa[ny][nx] === 0) {
+                            caminos.push({ x: nx, y: ny });
+                        }
+                    }
+
+                    if (caminos.length > 0) {
+                        const move = caminos[Math.floor(Math.random() * caminos.length)];
                         e.x = move.x;
                         e.y = move.y;
                     }
                 }
             }
+
             verificarColision();
             dibujarLaberinto();
         }
 
-        // Línea de visión (misma distancia, pero dentro de 6 casillas máximo)
+        // ✅ Línea de visión con límite de distancia
         function lineaVision(enemigo, jugador) {
             const dist = Math.abs(enemigo.x - jugador.x) + Math.abs(enemigo.y - jugador.y);
-            if (dist > 6) return false; // solo ve si está cerca
+            if (dist > 7) return false;
             if (enemigo.x === jugador.x) {
-                const minY = Math.min(enemigo.y, jugador.y);
-                const maxY = Math.max(enemigo.y, jugador.y);
+                const [minY, maxY] = [Math.min(enemigo.y, jugador.y), Math.max(enemigo.y, jugador.y)];
                 for (let y = minY + 1; y < maxY; y++) if (mapa[y][enemigo.x] === 1) return false;
                 return true;
-            } else if (enemigo.y === jugador.y) {
-                const minX = Math.min(enemigo.x, jugador.x);
-                const maxX = Math.max(enemigo.x, jugador.x);
+            }
+            if (enemigo.y === jugador.y) {
+                const [minX, maxX] = [Math.min(enemigo.x, jugador.x), Math.max(enemigo.x, jugador.x)];
                 for (let x = minX + 1; x < maxX; x++) if (mapa[enemigo.y][x] === 1) return false;
                 return true;
             }
             return false;
         }
 
-        // Colisión
         function verificarColision() {
             for (const e of enemigos) {
                 if (e.x === jugador.x && e.y === jugador.y) {
@@ -241,7 +235,6 @@
             }
         }
 
-        // Reiniciar juego
         function reiniciar() {
             generarLaberinto();
             jugador = { x: 1, y: 1 };
@@ -249,7 +242,6 @@
             dibujarLaberinto();
         }
 
-        // Generar enemigos
         function generarEnemigos(num) {
             enemigos = [];
             for (let i = 0; i < num; i++) {
