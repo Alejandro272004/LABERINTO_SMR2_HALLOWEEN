@@ -115,6 +115,10 @@
                 this.audioInitialized = false;
                 this._audioCtx = null;
 
+                // Variables de control de movimiento
+                this.lastMoveTime = 0;
+                this.moveDelay = 150; // 150ms entre movimientos (ajustable)
+
                 this.#initDOMGrid();
                 this.#initAudio();
                 this.reset();
@@ -130,6 +134,9 @@
                 this.destructWalls.clear();
                 this.traps = [];
                 this.#setMessage("", true);
+
+                // Resetear control de movimiento
+                this.lastMoveTime = 0;
 
                 // Reiniciar temporizador
                 this.timeLeft = TIMER_DURATION;
@@ -338,6 +345,13 @@
                     // Si el juego terminó, no hacer nada
                     if (this.gameOver) return;
 
+                    // Control de velocidad de movimiento - evitar spam
+                    const currentTime = Date.now();
+                    if (currentTime - this.lastMoveTime < this.moveDelay) {
+                        e.preventDefault();
+                        return; // Ignorar si es demasiado rápido
+                    }
+
                     // Obtener dirección del movimiento
                     console.log(`🎮 Tecla presionada: "${e.key}"`);
                     const direction = getDirection(e.key);
@@ -348,6 +362,9 @@
 
                     console.log(`🎯 Dirección detectada: ${direction.name} (${direction.dr}, ${direction.dc})`);
                     e.preventDefault();
+                    
+                    // Actualizar tiempo del último movimiento
+                    this.lastMoveTime = currentTime;
                     // Intentar mover jugador
                     const moved = this.#movePlayer(direction.dr, direction.dc);
                     if (moved || this._consumedTurn) {
@@ -875,7 +892,9 @@
                 if (this.killedMonsters >= TARGET_KILLS && this.goal && this.player.r === this.goal.r && this.player.c === this.goal.c) {
                     this.gameOver = true;
                     this.#stopTimer(); // Parar temporizador
-                    this.#setMessage("🎉 ¡Has escapado del laberinto! Pulsa R para jugar otra vez.", false);
+                    
+                    // Redirigir inmediatamente al laberinto de Alejandro
+                    window.location.href = 'LABERINTO_ALEJANDRO_GONZALEZ.html';
                 }
             }
 
