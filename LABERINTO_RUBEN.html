@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Laberinto</title>
+    <script>
+        const ROWS = 24;
+        const COLS = 24;
+        const MONSTER_COUNT = 3;          // Enemigos iniciales
+        const DAGGER_COUNT = 3;           // Puñales iniciales
+        const TARGET_KILLS = 3;           // Enemigos a eliminar para abrir la salida
+        const DAGGER_SPAWN_CHANCE = 0.15; // 15% de probabilidad de que aparezca un puñal al matar
+        const OBSTACLE_DENSITY = 0.45;    // 45% muros para más dificultad
+        const TRAP_COUNT = 8;             // Número de trampas/minas ocultas (aumentado)
+        const TRAP_AGGRO_TURNS = 10;      // Turnos que los enemigos se acercan tras trampa
+        const DWALL_HITS = 3;             // Golpes para romper un muro destructible
+        const TRAP_HINTS = true;          // Mostrar indicios sutiles de trampas
+        const TRAP_HINT_RADIUS = 2;       // Radio (Manhattan) para mostrar indicio cerca del jugador
+        const TIMER_DURATION = 180;       // 3 minutos en segundos (180)
+
+        // Utilidades básicas
+        const inBounds = (r, c) => r >= 0 && c >= 0 && r < ROWS && c < COLS;
+
+        // Sistema de movimiento - Convierte teclas en direcciones
+        const getDirection = (key) => {
+            const directions = {
+                'ArrowUp': { dr: -1, dc: 0, name: 'ARRIBA' },
+                'w': { dr: -1, dc: 0, name: 'ARRIBA' },
+                'W': { dr: -1, dc: 0, name: 'ARRIBA' },
+                'ArrowDown': { dr: 1, dc: 0, name: 'ABAJO' },
+                's': { dr: 1, dc: 0, name: 'ABAJO' },
+                'S': { dr: 1, dc: 0, name: 'ABAJO' },
+                'ArrowLeft': { dr: 0, dc: -1, name: 'IZQUIERDA' },
+                'a': { dr: 0, dc: -1, name: 'IZQUIERDA' },
+                'A': { dr: 0, dc: -1, name: 'IZQUIERDA' },
+                'ArrowRight': { dr: 0, dc: 1, name: 'DERECHA' },
+                'd': { dr: 0, dc: 1, name: 'DERECHA' },
+                'D': { dr: 0, dc: 1, name: 'DERECHA' }
+            };
+            return directions[key] || null;
+        };
+
+        class Maze {
+            constructor(rows, cols) {
+                this.rows = rows;
+                this.cols = cols;
+                this.grid = this.#generate();
+            }
+            #generate() {
+                // Crea toda la grilla llena de caminos (1 = camino)
+                const g = Array.from({ length: this.rows }, () => Array(this.cols).fill(1));
+
+                // Agrega muros internos aleatorios, pero sin tocar los bordes
+                for (let r = 1; r < this.rows - 1; r++) {
+                    for (let c = 1; c < this.cols - 1; c++) {
+                        g[r][c] = Math.random() < OBSTACLE_DENSITY ? 0 : 1; // densidad de muros
+                    }
+                }
+
+                // Asegura que todos los bordes exteriores sean caminos (sin muros)
+                for (let c = 0; c < this.cols; c++) {
+                    g[0][c] = 1; // borde superior
+                    g[this.rows - 1][c] = 1; // borde inferior
+                }
+                for (let r = 0; r < this.rows; r++) {
+                    g[r][0] = 1; // borde izquierdo
+                    g[r][this.cols - 1] = 1; // borde derecho
+                }
+
+                // Posición inicial del jugador
+                g[1][1] = 1;
+
+                // Meta (salida): cerca del borde opuesto
+                g[this.rows - 2][this.cols - 2] = 1;
+
+                return g;
+            }
+
+
+
+            isPath(r, c) {
+                return inBounds(r, c) && this.grid[r][c] === 1;
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.mazeElement = document.getElementById("maze");
+                this.messageEl = document.getElementById("message");
+                this.timerEl = document.getElementById("timer");
+                this.killOverlay = document.getElementById("kill-overlay");
+                this.killSfx = document.getElementById("kill-sfx");
+                this.pickupSfx = document.getElementById("pickup-sfx");
+                this.deathSfx = document.getElementById("death-sfx");
+                this._consumedTurn = false;        // Marca si una acción sin movimiento consume turno
+                this.aggroTurns = 0;               // Turnos de aggro global tras trampa
+                this.destructWalls = new Map();    // key -> golpesRestantes
+                this.traps = [];                   // {r,c,armed}
+                this.cells = [];
+                this.maze = null;
+                this.player = null;
+                this.monsters = [];
+                this.daggers = [];
+                this.playerHasDagger = false;
+                this.killedMonsters = 0;
+                this.gameOver = false;
+
+                // Variables del temporizador
+                this.timeLeft = TIMER_DURATION;
+                this.timerInterval = null;
+
+                // Variables de audio
+                this.audioInitialized = false;
+                this._audioCtx = null;
+
+                this.#initDOMGrid();
+                this.#initAudio();
+                this.reset();
+                this.#bindInput();
+            }
+
+            reset() {
+                this.gameOver = false;
+                this.playerHasDagger = false;
+                this.killedMonsters = 0;
+                this._consumedTurn = false;
+                this.aggroTurns = 0;
+                this.destructWalls.clear();
+                this.traps = [];
+                this.#setMessage("", true);
+
+                // Reiniciar temporizador
+                this.timeLeft = TIMER_DURATION;
+                this.#stopTimer();
+                this.#startTimer();
+                this.#updateTimer();
+
+                this.maze = new Maze(ROWS, COLS);
+
+                // Limpiar todas las celdas
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        const cell = this.cells[r][c];
+                        // Remover todas las clases de entidades
+                        cell.className = "cell";
+                        // Establecer tipo de celda (muro o camino)
+                        if (this.maze.grid[r][c] === 0) {
+                            cell.classList.add("wall");
+                        } else {
+                            cell.classList.add("path");
+                        }
+                    }
+                }
+
+                this.player = { r: 1, c: 1 };
+                this.goal = this.#farthestPathFrom(this.player);
+
+                // Celdas alcanzables desde el jugador para evitar spawns encerrados
+                const reachable = this.#reachablePathCellsFrom(this.player);
+                const used = new Set([this.#key(this.player)]);
+                const farEnough = (r, c) => Math.abs(r - this.player.r) + Math.abs(c - this.player.c) >= 10;
+
+                // Monstruos en celdas alcanzables y a distancia mínima
+                this.monsters = [];
+                let monsterCandidates = reachable.filter(rc => farEnough(rc.r, rc.c));
+                while (this.monsters.length < MONSTER_COUNT && monsterCandidates.length > 0) {
+                    const idx = Math.floor(Math.random() * monsterCandidates.length);
+                    const rc = monsterCandidates.splice(idx, 1)[0];
+                    const k = this.#key(rc);
+                    if (!used.has(k)) {
+                        used.add(k);
+                        this.monsters.push(rc);
+                    }
+                }
+
+                // Puñales en celdas alcanzables
+                this.daggers = [];
+                let daggerCandidates = reachable.slice();
+                while (this.daggers.length < DAGGER_COUNT && daggerCandidates.length > 0) {
+                    const idx = Math.floor(Math.random() * daggerCandidates.length);
+                    const rc = daggerCandidates.splice(idx, 1)[0];
+                    const k = this.#key(rc);
+                    if (!used.has(k)) {
+                        used.add(k);
+                        this.daggers.push(rc);
+                    }
+                }
+
+                // Trampas ocultas en celdas alcanzables (no en jugador, no en meta, no encima de puñales/monstruos)
+                const forbidden = new Set([
+                    this.#key(this.player),
+                    this.goal ? this.#key(this.goal) : null,
+                    ...this.monsters.map(m => this.#key(m)),
+                    ...this.daggers.map(d => this.#key(d))
+                ].filter(Boolean));
+                let trapCandidates = reachable.filter(rc => !forbidden.has(this.#key(rc)));
+                while (this.traps.length < TRAP_COUNT && trapCandidates.length > 0) {
+                    const idx = Math.floor(Math.random() * trapCandidates.length);
+                    const rc = trapCandidates.splice(idx, 1)[0];
+                    this.traps.push({ r: rc.r, c: rc.c, armed: true });
+                }
+
+                this.#renderEntities();
+            }
+
+            #initDOMGrid() {
+                this.mazeElement.innerHTML = "";
+                this.cells = Array.from({ length: ROWS }, () => Array(COLS));
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        const d = document.createElement("div");
+                        d.className = "cell";
+                        this.cells[r][c] = d;
+                        this.mazeElement.appendChild(d);
+                    }
+                }
+            }
+
+            #initAudio() {
+                // Configurar volumen y propiedades de los elementos de audio
+                if (this.killSfx) {
+                    this.killSfx.volume = 0.7;
+                    this.killSfx.preload = 'auto';
+                    this.killSfx.load(); // Forzar carga del archivo
+
+                    // Listener para debug
+                    this.killSfx.addEventListener('canplaythrough', () => {
+                        console.log('✅ kill.mp3 cargado completamente');
+                    });
+                    this.killSfx.addEventListener('error', (e) => {
+                        console.error('❌ Error cargando kill.mp3:', e);
+                    });
+                }
+                if (this.pickupSfx) {
+                    this.pickupSfx.volume = 0.5;
+                    this.pickupSfx.preload = 'auto';
+                    this.pickupSfx.load();
+
+                    // Listener para debug
+                    this.pickupSfx.addEventListener('canplaythrough', () => {
+                        console.log('✅ pickup.mp3 cargado completamente');
+                    });
+                    this.pickupSfx.addEventListener('error', (e) => {
+                        console.error('❌ Error cargando pickup.mp3:', e);
+                    });
+                }
+                if (this.deathSfx) {
+                    this.deathSfx.volume = 0.8;
+                    this.deathSfx.preload = 'auto';
+                    this.deathSfx.load();
+
+                    // Listener para debug
+                    this.deathSfx.addEventListener('canplaythrough', () => {
+                        console.log('✅ death.mp3 cargado completamente');
+                    });
+                    this.deathSfx.addEventListener('error', (e) => {
+                        console.error('❌ Error cargando death.mp3:', e);
+                    });
+                }
+
+                // Crear contexto de audio para fallbacks
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        this._audioCtx = new AudioCtx();
+                    }
+                } catch (e) {
+                    console.warn('AudioContext no disponible:', e);
+                }
+            }
+
+            #enableAudio() {
+                if (this.audioInitialized) return;
+
+                // Intentar activar contexto de audio si existe
+                if (this._audioCtx && this._audioCtx.state === 'suspended') {
+                    this._audioCtx.resume().then(() => {
+                        console.log('AudioContext activado');
+                    }).catch(e => {
+                        console.warn('Error activando AudioContext:', e);
+                    });
+                }
+
+                // Intentar reproducir silencio en cada elemento de audio para habilitarlos
+                [this.killSfx, this.pickupSfx, this.deathSfx].forEach(audio => {
+                    if (audio) {
+                        const originalVolume = audio.volume;
+                        audio.volume = 0;
+                        audio.play().then(() => {
+                            audio.pause();
+                            audio.currentTime = 0;
+                            audio.volume = originalVolume;
+                        }).catch(() => {
+                            // Ignorar errores de inicialización
+                        });
+                    }
+                });
+
+                this.audioInitialized = true;
+                console.log('Sistema de audio inicializado');
+
+                // Mostrar estado de los archivos después de un momento
+                setTimeout(() => {
+                    this.#debugAudioState();
+                }, 1000);
+            }
+
+            #debugAudioState() {
+                console.log('📊 Estado de archivos de audio:');
+                if (this.killSfx) {
+                    console.log(`  kill.mp3: readyState=${this.killSfx.readyState}, networkState=${this.killSfx.networkState}, error=${this.killSfx.error}`);
+                }
+                if (this.pickupSfx) {
+                    console.log(`  pickup.mp3: readyState=${this.pickupSfx.readyState}, networkState=${this.pickupSfx.networkState}, error=${this.pickupSfx.error}`);
+                }
+                if (this.deathSfx) {
+                    console.log(`  death.mp3: readyState=${this.deathSfx.readyState}, networkState=${this.deathSfx.networkState}, error=${this.deathSfx.error}`);
+                }
+            }
+
+            // NUEVO SISTEMA DE MOVIMIENTO DEL JUGADOR
+            #bindInput() {
+                window.addEventListener("keydown", (e) => {
+                    // Activar audio con la primera interacción
+                    if (!this.audioInitialized) {
+                        this.#enableAudio();
+                    }
+
+                    // Reiniciar juego
+                    if (e.key === "r" || e.key === "R") {
+                        e.preventDefault();
+                        this.reset();
+                        return;
+                    }
+
+                    // Si el juego terminó, no hacer nada
+                    if (this.gameOver) return;
+
+                    // Obtener dirección del movimiento
+                    console.log(`🎮 Tecla presionada: "${e.key}"`);
+                    const direction = getDirection(e.key);
+                    if (!direction) {
+                        console.log(`❌ Tecla no reconocida: "${e.key}"`);
+                        return;
+                    }
+
+                    console.log(`🎯 Dirección detectada: ${direction.name} (${direction.dr}, ${direction.dc})`);
+                    e.preventDefault();
+                    // Intentar mover jugador
+                    const moved = this.#movePlayer(direction.dr, direction.dc);
+                    if (moved || this._consumedTurn) {
+                        // El jugador se movió exitosamente
+                        this.#processPlayerActions();
+
+                        // Verificar colisiones después del movimiento del jugador
+                        this.#checkGameEnd();
+                        if (this.gameOver) {
+                            // No hacer nada más si el juego terminó, la animación ya se aplicó
+                            return;
+                        }
+
+                        this.#moveMonsters();
+
+                        // Verificar colisiones después del movimiento de monstruos
+                        this.#checkGameEnd();
+                        if (this.gameOver) {
+                            // No hacer nada más si el juego terminó, la animación ya se aplicó
+                            return;
+                        }
+
+                        this.#updateDisplay();
+                        // Limpiar bandera de turno consumido por golpe a muro
+                        this._consumedTurn = false;
+                    }
+                });
+
+                // También inicializar audio con click
+                window.addEventListener("click", () => {
+                    if (!this.audioInitialized) {
+                        this.#enableAudio();
+                    }
+                }, { once: true });
+            }
+
+            // Mover jugador - retorna true si el movimiento fue exitoso
+            #movePlayer(deltaRow, deltaCol) {
+                console.log(`🔍 DEBUG MOVIMIENTO:`);
+                console.log(`  Posición actual: (${this.player.r}, ${this.player.c})`);
+                console.log(`  Delta: (${deltaRow}, ${deltaCol})`);
+
+                const newRow = this.player.r + deltaRow;
+                const newCol = this.player.c + deltaCol;
+
+                console.log(`  Nueva posición calculada: (${newRow}, ${newCol})`);
+
+                // Verificar límites y que sea un camino válido o un muro destructible
+                if (!inBounds(newRow, newCol)) {
+                    console.log(`  ❌ Fuera de límites`);
+                    return false;
+                }
+
+                const targetKey = `${newRow},${newCol}`;
+                if (this.destructWalls.has(targetKey)) {
+                    // Golpear muro destructible: consume turno, no te mueves
+                    let hits = this.destructWalls.get(targetKey);
+                    // Pequeño flash visual de impacto
+                    const hitCell = this.cells[newRow][newCol];
+                    hitCell.classList.add('dwall-hit');
+                    setTimeout(() => hitCell.classList.remove('dwall-hit'), 180);
+                    hits -= 1;
+                    if (hits <= 0) {
+                        this.destructWalls.delete(targetKey);
+                        this.#setMessage("💥 Muro destruido!", false);
+                        setTimeout(() => this.#setMessage("", true), 900);
+                    } else {
+                        this.destructWalls.set(targetKey, hits);
+                        this.#setMessage(`🔨 Golpeas el muro (${hits} restantes)`, false);
+                        setTimeout(() => this.#setMessage("", true), 700);
+                    }
+                    this._consumedTurn = true; // cuenta como turno del jugador
+                    return false;
+                }
+
+                if (!this.maze.isPath(newRow, newCol)) {
+                    console.log(`  ❌ No es un camino válido`);
+                    return false;
+                }
+
+                // Mover jugador
+                const oldR = this.player.r;
+                const oldC = this.player.c;
+                this.player.r = newRow;
+                this.player.c = newCol;
+
+                console.log(`  ✅ Jugador movido de (${oldR}, ${oldC}) a (${this.player.r}, ${this.player.c})`);
+                return true;
+            }
+
+            // Procesar acciones del jugador (recoger puñales)
+            #processPlayerActions() {
+                this.#checkDaggerPickup();
+                this.#checkTrapTrigger();
+            }
+
+
+
+            // NUEVO SISTEMA DE MOVIMIENTO DE MONSTRUOS
+            #moveMonsters() {
+                // Crear un mapa de posiciones planificadas para evitar colisiones
+                const plannedMoves = new Map();
+
+                for (const monster of this.monsters) {
+                    const newPos = this.#calculateMonsterMove(monster, plannedMoves);
+                    if (newPos) {
+                        // Reservar la nueva posición
+                        const key = `${newPos.r},${newPos.c}`;
+                        plannedMoves.set(key, monster);
+
+                        // Mover el monstruo
+                        monster.r = newPos.r;
+                        monster.c = newPos.c;
+                    }
+                }
+                if (this.aggroTurns > 0) this.aggroTurns -= 1;
+            }
+
+            #moveMonster(monster) {
+                // Direcciones posibles: arriba, abajo, izquierda, derecha
+                const directions = [
+                    { dr: -1, dc: 0 }, // arriba
+                    { dr: 1, dc: 0 },  // abajo
+                    { dr: 0, dc: -1 }, // izquierda
+                    { dr: 0, dc: 1 }   // derecha
+                ];
+
+                // Encontrar movimientos válidos
+                const validMoves = [];
+                for (const dir of directions) {
+                    const newR = monster.r + dir.dr;
+                    const newC = monster.c + dir.dc;
+
+                    if (inBounds(newR, newC) && this.maze.isPath(newR, newC)) {
+                        validMoves.push({
+                            r: newR,
+                            c: newC,
+                            dr: dir.dr,
+                            dc: dir.dc
+                        });
+                    }
+                }
+
+                if (validMoves.length === 0) return; // No hay movimientos válidos
+
+                // Calcular distancia al jugador
+                const distanceToPlayer = Math.abs(monster.r - this.player.r) + Math.abs(monster.c - this.player.c);
+                // Si hay aggro global, siempre consideramos "cerca"
+                const isPlayerNearby = this.aggroTurns > 0 || distanceToPlayer <= 5;
+
+                let chosenMove;
+
+                if (!isPlayerNearby) {
+                    // JUGADOR LEJOS → Movimiento completamente ALEATORIO
+                    console.log(`  Jugador lejos (distancia: ${distanceToPlayer}): Monstruo en (${monster.r},${monster.c}) se mueve ALEATORIAMENTE`);
+                    chosenMove = this.#chooseRandomMove(validMoves);
+                } else {
+                    // JUGADOR CERCA → Reaccionar según si está armado o no
+                    if (this.playerHasDagger && this.aggroTurns === 0) {
+                        // JUGADOR ARMADO Y CERCA = PELIGROSO → HUIR con alta probabilidad
+                        console.log(`🔪 Jugador armado cerca (distancia: ${distanceToPlayer}): Monstruo en (${monster.r},${monster.c}) INTENTA HUIR`);
+                        chosenMove = this.#chooseFleeMove(monster, validMoves);
+                    } else {
+                        // JUGADOR DESARMADO Y CERCA = VULNERABLE → PERSEGUIR por el camino más corto
+                        console.log(`🎯 Jugador desarmado cerca (distancia: ${distanceToPlayer}): Monstruo en (${monster.r},${monster.c}) PERSIGUE AGRESIVAMENTE`);
+                        chosenMove = this.#chooseAggressivePursuitMove(monster, validMoves);
+                    }
+                }
+
+                // Mover el monstruo
+                if (chosenMove) {
+                    monster.r = chosenMove.r;
+                    monster.c = chosenMove.c;
+                }
+            }
+
+            #calculateMonsterMove(monster, plannedMoves) {
+                // Direcciones posibles: arriba, abajo, izquierda, derecha
+                const directions = [
+                    { dr: -1, dc: 0 }, // arriba
+                    { dr: 1, dc: 0 },  // abajo
+                    { dr: 0, dc: -1 }, // izquierda
+                    { dr: 0, dc: 1 }   // derecha
+                ];
+
+                // Encontrar movimientos válidos (sin colisiones con otros monstruos)
+                const validMoves = [];
+                for (const dir of directions) {
+                    const newR = monster.r + dir.dr;
+                    const newC = monster.c + dir.dc;
+                    const key = `${newR},${newC}`;
+
+                    if (inBounds(newR, newC) && this.maze.isPath(newR, newC)) {
+                        // Verificar que no haya otro monstruo en esa posición actual
+                        const hasMonster = this.monsters.some(m => m !== monster && m.r === newR && m.c === newC);
+                        // Verificar que no esté ya reservada por otro monstruo en este turno
+                        const isReserved = plannedMoves.has(key);
+
+                        if (!hasMonster && !isReserved) {
+                            validMoves.push({
+                                r: newR,
+                                c: newC,
+                                dr: dir.dr,
+                                dc: dir.dc
+                            });
+                        }
+                    }
+                }
+
+                if (validMoves.length === 0) {
+                    console.log(`🚫 Monstruo en (${monster.r},${monster.c}) no puede moverse - sin celdas válidas`);
+                    return null; // No hay movimientos válidos
+                }
+
+                // Calcular distancia al jugador
+                const distanceToPlayer = Math.abs(monster.r - this.player.r) + Math.abs(monster.c - this.player.c);
+                // Si hay aggro global, siempre consideramos "cerca"
+                const isPlayerNearby = this.aggroTurns > 0 || distanceToPlayer <= 5;
+
+                let chosenMove;
+
+                if (!isPlayerNearby) {
+                    // JUGADOR LEJOS → Movimiento completamente ALEATORIO
+                    console.log(`🚶 Jugador lejos (distancia: ${distanceToPlayer}): Monstruo en (${monster.r},${monster.c}) se mueve ALEATORIAMENTE`);
+                    chosenMove = this.#chooseRandomMove(validMoves);
+                } else {
+                    // JUGADOR CERCA → Reaccionar según si está armado o no
+                    if (this.playerHasDagger && this.aggroTurns === 0) {
+                        // JUGADOR ARMADO Y CERCA = PELIGROSO → HUIR con alta probabilidad
+                        console.log(`🔪 Jugador armado cerca (distancia: ${distanceToPlayer}): Monstruo en (${monster.r},${monster.c}) INTENTA HUIR`);
+                        chosenMove = this.#chooseFleeMove(monster, validMoves);
+                    } else {
+                        // JUGADOR DESARMADO Y CERCA = VULNERABLE → PERSEGUIR por el camino más corto
+                        console.log(`🎯 Jugador desarmado cerca (distancia: ${distanceToPlayer}): Monstruo en (${monster.r},${monster.c}) PERSIGUE AGRESIVAMENTE`);
+                        chosenMove = this.#chooseAggressivePursuitMove(monster, validMoves);
+                    }
+                }
+
+                return chosenMove;
+            }
+
+            #chooseRandomMove(validMoves) {
+                // Movimiento completamente aleatorio
+                const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                console.log(`   → ALEATORIO: va a (${randomMove.r},${randomMove.c})`);
+                return randomMove;
+            }
+
+            #chooseAggressivePursuitMove(monster, validMoves) {
+                // Calcular distancias al jugador para cada movimiento
+                const movesWithDistance = validMoves.map(move => {
+                    const distance = Math.abs(move.r - this.player.r) + Math.abs(move.c - this.player.c);
+                    return { ...move, distance };
+                });
+
+                // Ordenar por distancia (más cerca primero para PERSEGUIR AGRESIVAMENTE)
+                movesWithDistance.sort((a, b) => a.distance - b.distance);
+
+                // SIEMPRE elegir el movimiento más directo hacia el jugador (camino más corto)
+                const bestMove = movesWithDistance[0];
+                console.log(`   → PERSECUCIÓN AGRESIVA: va de (${monster.r},${monster.c}) a (${bestMove.r},${bestMove.c}) [distancia: ${bestMove.distance}]`);
+                return bestMove;
+            }
+
+            #chooseFleeMove(monster, validMoves) {
+                // Calcular distancias al jugador para cada movimiento
+                const movesWithDistance = validMoves.map(move => {
+                    const distance = Math.abs(move.r - this.player.r) + Math.abs(move.c - this.player.c);
+                    return { ...move, distance };
+                });
+
+                // Ordenar por distancia (más lejos primero para HUIR)
+                movesWithDistance.sort((a, b) => b.distance - a.distance);
+
+                // 80% probabilidad de huir del jugador, 20% movimiento aleatorio
+                if (Math.random() < 0.8) {
+                    // Elegir el mejor movimiento para huir
+                    const bestMove = movesWithDistance[0];
+                    console.log(`   → HUYENDO: va de (${monster.r},${monster.c}) a (${bestMove.r},${bestMove.c}) [distancia: ${bestMove.distance}]`);
+                    return bestMove;
+                } else {
+                    // Movimiento completamente aleatorio (20% de las veces)
+                    const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                    console.log(`   → ALEATORIO (pánico): va de (${monster.r},${monster.c}) a (${randomMove.r},${randomMove.c})`);
+                    return randomMove;
+                }
+            }
+
+            // Actualizar la pantalla
+            #updateDisplay() {
+                this.#renderEntities();
+            }
+
+            // Verificar condiciones de fin de juego
+            #checkGameEnd() {
+                this.#checkEnd();
+            }
+
+            #renderEntities() {
+                // Limpiar todas las clases dinámicas (pero preservar animaciones)
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        const cell = this.cells[r][c];
+                        // No limpiar si hay una animación en curso
+                        if (!cell.classList.contains("dying") && !cell.classList.contains("combat-victory")) {
+                            cell.classList.remove("player", "monster", "armed", "dagger", "goal", "trap-hint");
+                        }
+                        // Quitar estados de muro destructible para recalcular
+                        cell.classList.remove("dwall", "crack-1", "crack-2", "crack-3");
+                    }
+                }
+
+                // Agregar muros destructibles SIEMPRE visibles (independientemente del puñal)
+                this.destructWalls.forEach((hits, key) => {
+                    const [r, c] = key.split(",").map(Number);
+                    const cell = this.cells[r][c];
+                    cell.classList.add("dwall");
+                    const cracks = DWALL_HITS - hits; // 0..3
+                    if (cracks >= 1) cell.classList.add("crack-1");
+                    if (cracks >= 2) cell.classList.add("crack-2");
+                    if (cracks >= 3) cell.classList.add("crack-3");
+                });
+
+                // Agregar puñales
+                this.daggers.forEach(d => {
+                    this.cells[d.r][d.c].classList.add("dagger");
+                });
+
+                // Agregar puñales
+                this.monsters.forEach(m => {
+                    this.cells[m.r][m.c].classList.add("monster");
+                });
+
+                // Agregar jugador (solo si no está muriendo)
+                const playerCell = this.cells[this.player.r][this.player.c];
+                if (!playerCell.classList.contains("dying")) {
+                    playerCell.classList.add("player");
+                    if (this.playerHasDagger) {
+                        playerCell.classList.add("armed");
+                    }
+                }
+
+                // Agregar meta si se alcanzaron las bajas objetivo
+                if (this.killedMonsters >= TARGET_KILLS && this.goal) {
+                    this.cells[this.goal.r][this.goal.c].classList.add("goal");
+                }
+
+                // Mostrar indicios sutiles de trampas cercanas
+                if (TRAP_HINTS && this.traps?.length) {
+                    for (const t of this.traps) {
+                        if (!t.armed) continue;
+                        const dist = Math.abs(t.r - this.player.r) + Math.abs(t.c - this.player.c);
+                        if (dist <= TRAP_HINT_RADIUS) {
+                            this.cells[t.r][t.c].classList.add("trap-hint");
+                        }
+                    }
+                }
+            } #checkDaggerPickup() {
+                // Si el jugador ya tiene un puñal, no puede recoger otro
+                for (let i = 0; i < this.daggers.length; i++) {
+                    const dagger = this.daggers[i];
+                    if (dagger.r === this.player.r && dagger.c === this.player.c) {
+                        if (this.playerHasDagger) {
+                            // No retirar el puñal del suelo; solo informar
+                            this.#setMessage("🛑 Ya llevas un puñal. No puedes llevar dos.", false);
+                            setTimeout(() => this.#setMessage("", true), 1000);
+                            return;
+                        }
+                        // Recoger solo si no tiene uno aún
+                        this.daggers.splice(i, 1); // Eliminar puñal del suelo
+                        this.playerHasDagger = true;
+                        this.#playPickupSfx();
+                        this.#setMessage("🗡️ ¡Puñal recogido!", false);
+                        setTimeout(() => this.#setMessage("", true), 1500);
+                        return;
+                    }
+                }
+            }
+
+            #farthestPathFrom(start) {
+                const q = [start];
+                const seen = new Set([`${start.r},${start.c}`]);
+                let far = { ...start };
+                const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+                while (q.length) {
+                    const cur = q.shift();
+                    far = cur;
+                    for (const [dr, dc] of dirs) {
+                        const nr = cur.r + dr, nc = cur.c + dc;
+                        if (!this.maze.isPath(nr, nc)) continue;
+                        const k = `${nr},${nc}`;
+                        if (seen.has(k)) continue;
+                        seen.add(k);
+                        q.push({ r: nr, c: nc });
+                    }
+                }
+                return far;
+            }
+
+            // Todas las celdas de camino alcanzables desde 'start'
+            #reachablePathCellsFrom(start) {
+                const result = [];
+                const q = [start];
+                const seen = new Set([`${start.r},${start.c}`]);
+                const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+                while (q.length) {
+                    const cur = q.shift();
+                    result.push(cur);
+                    for (const [dr, dc] of dirs) {
+                        const nr = cur.r + dr, nc = cur.c + dc;
+                        if (!this.maze.isPath(nr, nc)) continue;
+                        const k = `${nr},${nc}`;
+                        if (seen.has(k)) continue;
+                        seen.add(k);
+                        q.push({ r: nr, c: nc });
+                    }
+                }
+                return result;
+            }
+
+            #checkEnd() {
+                // Si el juego ya terminó, no hacer nada más
+                if (this.gameOver) return;
+
+                // Verificar colisión con monstruos
+                for (let i = 0; i < this.monsters.length; i++) {
+                    const monster = this.monsters[i];
+                    if (monster.r === this.player.r && monster.c === this.player.c) {
+                        console.log(`🚨 COLISIÓN DETECTADA: Jugador (${this.player.r},${this.player.c}) vs Monstruo (${monster.r},${monster.c})`);
+                        console.log(`🗡️ Estado del puñal: ${this.playerHasDagger ? 'ARMADO' : 'DESARMADO'}`);
+
+                        if (this.playerHasDagger) {
+                            // El jugador tiene puñal - COMBATE EXITOSO (matar monstruo)
+                            console.log(`⚔️ COMBATE: Jugador armado mata al monstruo en (${monster.r},${monster.c})`);
+
+                            // Eliminar monstruo INMEDIATAMENTE
+                            this.monsters.splice(i, 1);
+                            this.playerHasDagger = false; // Puñal se rompe
+                            this.killedMonsters++;
+
+                            // Capturar coordenadas para evitar "jugador duplicado" si se mueve antes del timeout
+                            const animMonsterR = monster.r;
+                            const animMonsterC = monster.c;
+                            const animPlayerR = this.player.r;
+                            const animPlayerC = this.player.c;
+
+                            // Mostrar overlay de sangre y reproducir SFX
+                            this.#showKillOverlay();
+                            this.#playKillSfx();
+
+                            // Aplicar animaciones en las celdas capturadas
+                            this.cells[animMonsterR][animMonsterC].classList.add("dying");
+                            this.cells[animPlayerR][animPlayerC].classList.add("combat-victory");
+
+                            // Limpiar animaciones después (usando posiciones capturadas)
+                            setTimeout(() => {
+                                const monsterCell = this.cells[animMonsterR]?.[animMonsterC];
+                                if (monsterCell) monsterCell.classList.remove("monster", "dying");
+
+                                const playerCellAtAnim = this.cells[animPlayerR]?.[animPlayerC];
+                                if (playerCellAtAnim) playerCellAtAnim.classList.remove("combat-victory", "armed", "player");
+
+                                this.#renderEntities();
+                            }, 500);
+
+                            // Posible aparición de un nuevo puñal (15% por defecto) en una celda alcanzable y libre
+                            if (Math.random() < DAGGER_SPAWN_CHANCE) {
+                                const reachable = this.#reachablePathCellsFrom(this.player);
+                                const usedKeys = new Set([
+                                    this.#key(this.player),
+                                    ...this.monsters.map(m => this.#key(m)),
+                                    ...this.daggers.map(d => this.#key(d)),
+                                    this.goal ? this.#key(this.goal) : null,
+                                    `${animMonsterR},${animMonsterC}`
+                                ].filter(Boolean));
+                                const free = reachable.filter(rc => !usedKeys.has(this.#key(rc)));
+                                if (free.length > 0) {
+                                    const rc = free[Math.floor(Math.random() * free.length)];
+                                    this.daggers.push(rc);
+                                    this.#renderEntities();
+                                    this.#setMessage("🗡️ ¡Ha aparecido un nuevo puñal!", false);
+                                    setTimeout(() => this.#setMessage("", true), 1200);
+                                }
+                            }
+
+                            // Mensaje de progreso de objetivo (kills requeridos)
+                            if (this.killedMonsters >= TARGET_KILLS) {
+                                this.#setMessage("🎉 ¡Objetivo cumplido! La salida se abrió.", false);
+                            } else {
+                                const restantes = TARGET_KILLS - this.killedMonsters;
+                                this.#setMessage(`⚔️ ¡Enemigo eliminado! Faltan ${restantes} para abrir la salida.`, false);
+                            }
+                            setTimeout(() => this.#setMessage("", true), 2000);
+
+                            return; // Salir después del combate exitoso
+                        } else {
+                            // El jugador NO tiene puñal - MUERTE
+                            console.log(`💀 MUERTE: Jugador desarmado es atrapado por monstruo en (${monster.r},${monster.c})`);
+                            this.gameOver = true;
+                            this.#stopTimer(); // Parar temporizador
+                            // Reproducir sonido de muerte
+                            this.#playDeathSfx();
+
+                            // Asegurar que el jugador esté visible antes de la animación
+                            this.cells[this.player.r][this.player.c].classList.remove("monster", "dagger", "goal");
+                            this.cells[this.player.r][this.player.c].classList.add("player");
+
+                            // Forzar un reflow para asegurar que los estilos se apliquen
+                            this.cells[this.player.r][this.player.c].offsetHeight;
+
+                            // Aplicar animación de muerte
+                            this.cells[this.player.r][this.player.c].classList.add("dying");
+                            this.#setMessage("💀 ¡Has sido atrapado! Pulsa R para reiniciar.", false);
+
+                            // Remover las clases después de la animación
+                            setTimeout(() => {
+                                this.cells[this.player.r][this.player.c].classList.remove("player", "armed", "dying");
+                            }, 800);
+                            return;
+                        }
+                    }
+                }
+
+                // Verificar victoria (solo se requieren TARGET_KILLS eliminaciones)
+                if (this.killedMonsters >= TARGET_KILLS && this.goal && this.player.r === this.goal.r && this.player.c === this.goal.c) {
+                    this.gameOver = true;
+                    this.#stopTimer(); // Parar temporizador
+                    this.#setMessage("🎉 ¡Has escapado del laberinto! Pulsa R para jugar otra vez.", false);
+                }
+            }
+
+            // Si pisa una trampa: encerrar con muros destructibles, quitar puñal y aggro
+            #checkTrapTrigger() {
+                if (!this.traps?.length) return;
+                const keyHere = this.#key(this.player);
+                const trapIndex = this.traps.findIndex(t => t.armed && this.#key(t) === keyHere);
+                if (trapIndex === -1) return;
+
+                // Desarmar trampa
+                this.traps[trapIndex].armed = false;
+
+                // Crear muros destructibles alrededor (N,S,E,O) si son caminos
+                const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+                for (const [dr, dc] of dirs) {
+                    const r = this.player.r + dr, c = this.player.c + dc;
+                    if (inBounds(r, c) && this.maze.isPath(r, c)) {
+                        const k = `${r},${c}`;
+                        // No colocar sobre muros destructibles existentes
+                        if (!this.destructWalls.has(k)) this.destructWalls.set(k, DWALL_HITS);
+                    }
+                }
+
+                // Quitar puñal si lo tiene y reubicar ese puñal en otra parte alcanzable
+                if (this.playerHasDagger) {
+                    this.playerHasDagger = false;
+                    const reachable = this.#reachablePathCellsFrom(this.player);
+                    const usedKeys = new Set([
+                        this.#key(this.player),
+                        ...this.monsters.map(m => this.#key(m)),
+                        ...this.daggers.map(d => this.#key(d)),
+                        this.goal ? this.#key(this.goal) : null,
+                        ...Array.from(this.destructWalls.keys())
+                    ].filter(Boolean));
+                    const free = reachable.filter(rc => !usedKeys.has(this.#key(rc)));
+                    if (free.length > 0) {
+                        const rc = free[Math.floor(Math.random() * free.length)];
+                        this.daggers.push(rc);
+                    }
+                }
+
+                // Llamar a los enemigos (aggro global por varios turnos)
+                this.aggroTurns = TRAP_AGGRO_TURNS;
+
+                this.#setMessage("⚠️ ¡Trampa! Te han encerrado, perdiste el puñal y los enemigos se acercan.", false);
+                setTimeout(() => this.#setMessage("", true), 2000);
+            }
+
+            #randomPathCell() {
+                for (let tries = 0; tries < 200; tries++) {
+                    const r = 1 + Math.floor(Math.random() * (ROWS - 2));
+                    const c = 1 + Math.floor(Math.random() * (COLS - 2));
+                    if (this.maze.isPath(r, c)) return { r, c };
+                }
+                return null;
+            }
+
+            #setMessage(text, hidden) {
+                if (hidden) {
+                    this.messageEl.hidden = true;
+                    this.messageEl.textContent = "";
+                } else {
+                    this.messageEl.hidden = false;
+                    this.messageEl.textContent = text;
+                }
+            }
+
+            #key(p) { return `${p.r},${p.c}`; }
+
+            // Muestra un overlay de sangre por delante de todo durante ~3 segundos
+            #showKillOverlay() {
+                if (!this.killOverlay) return;
+                // Permitir re-disparo antes de terminar el anterior
+                if (this._killOverlayTimer) {
+                    clearTimeout(this._killOverlayTimer);
+                    this._killOverlayTimer = null;
+                }
+                this.killOverlay.classList.add('visible');
+                this._killOverlayTimer = setTimeout(() => {
+                    this.killOverlay.classList.remove('visible');
+                    this._killOverlayTimer = null;
+                }, 1500);
+            }
+
+            // Reproduce el sonido de "kill" si existe; si falla, usa un beep corto con WebAudio
+            #playKillSfx() {
+                console.log('🔊 Intentando reproducir sonido de muerte enemigo');
+
+                if (this.killSfx) {
+                    try {
+                        this.killSfx.currentTime = 0;
+                        const playPromise = this.killSfx.play();
+                        if (playPromise && typeof playPromise.then === 'function') {
+                            playPromise.then(() => {
+                                console.log('✅ Sonido de muerte enemigo reproducido');
+                            }).catch((error) => {
+                                console.warn('⚠️ Error reproduciendo kill.mp3:', error.message);
+                                this.#beepFallback();
+                            });
+                            return;
+                        } else {
+                            console.log('✅ Sonido de kill iniciado (sin promise)');
+                            return;
+                        }
+                    } catch (error) {
+                        console.warn('⚠️ Error directo con kill.mp3:', error.message);
+                    }
+                } else {
+                    console.error('❌ Elemento kill.mp3 no encontrado');
+                }
+
+                this.#beepFallback();
+            }
+
+            // Reproduce el sonido de recogida de puñal
+            #playPickupSfx() {
+                console.log('🔊 Intentando reproducir sonido de pickup');
+                console.log(`📊 pickup.mp3 readyState: ${this.pickupSfx ? this.pickupSfx.readyState : 'null'}`);
+
+                if (this.pickupSfx) {
+                    // Intentar reproducir incluso si readyState < 2, algunos navegadores lo permiten
+                    try {
+                        this.pickupSfx.currentTime = 0;
+                        const playPromise = this.pickupSfx.play();
+                        if (playPromise && typeof playPromise.then === 'function') {
+                            playPromise.then(() => {
+                                console.log('✅ Sonido de pickup reproducido exitosamente');
+                            }).catch((error) => {
+                                console.warn('⚠️ Error reproduciendo pickup.mp3:', error.message);
+                                console.log('🔄 Intentando sonido fallback...');
+                                this.#beepFallback(660, 0.15, 0.15, 'sine');
+                            });
+                            return; // Salir aquí, el promise manejará el resultado
+                        } else {
+                            // Navegadores muy antiguos sin promises
+                            console.log('✅ Sonido de pickup iniciado (sin promise)');
+                            return;
+                        }
+                    } catch (error) {
+                        console.warn('⚠️ Error directo con pickup.mp3:', error.message);
+                    }
+                } else {
+                    console.error('❌ Elemento pickup.mp3 no encontrado');
+                }
+
+                // Fallback
+                console.log('🔄 Usando sonido fallback para pickup');
+                this.#beepFallback(660, 0.15, 0.15, 'sine');
+            }
+
+            // Reproduce el sonido de muerte del jugador
+            #playDeathSfx() {
+                console.log('🔊 Intentando reproducir sonido de muerte jugador');
+
+                if (this.deathSfx) {
+                    try {
+                        this.deathSfx.currentTime = 0;
+                        const playPromise = this.deathSfx.play();
+                        if (playPromise && typeof playPromise.then === 'function') {
+                            playPromise.then(() => {
+                                console.log('✅ Sonido de muerte jugador reproducido');
+                            }).catch((error) => {
+                                console.warn('⚠️ Error reproduciendo death.mp3:', error.message);
+                                this.#beepFallback(140, 0.25, 0.14, 'sawtooth');
+                            });
+                            return;
+                        } else {
+                            console.log('✅ Sonido de death iniciado (sin promise)');
+                            return;
+                        }
+                    } catch (error) {
+                        console.warn('⚠️ Error directo con death.mp3:', error.message);
+                    }
+                } else {
+                    console.error('❌ Elemento death.mp3 no encontrado');
+                }
+
+                this.#beepFallback(140, 0.25, 0.14, 'sawtooth');
+            }
+
+            // Beep de emergencia muy corto (fallback si no hay archivo o está bloqueado)
+            #beepFallback(freq = 220, duration = 0.15, gainStart = 0.12, type = 'square') {
+                try {
+                    if (!this._audioCtx) {
+                        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                        if (!AudioCtx) {
+                            console.warn('⚠️ AudioContext no disponible, sin sonido fallback');
+                            return;
+                        }
+                        this._audioCtx = new AudioCtx();
+                    }
+
+                    const ctx = this._audioCtx;
+                    if (ctx.state === 'suspended') {
+                        ctx.resume();
+                    }
+
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = type;
+                    o.frequency.value = freq;
+                    g.gain.setValueAtTime(gainStart, ctx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+                    o.connect(g).connect(ctx.destination);
+                    o.start();
+                    o.stop(ctx.currentTime + duration);
+                    console.log(`🔊 Sonido fallback reproducido (${freq}Hz, ${type})`);
+                } catch (error) {
+                    console.warn('⚠️ Error con sonido fallback:', error);
+                }
+            }
+
+            // Métodos del temporizador
+            #startTimer() {
+                if (this.timerInterval) return; // Ya está corriendo
+                this.timerInterval = setInterval(() => {
+                    this.timeLeft--;
+                    this.#updateTimer();
+
+                    if (this.timeLeft <= 0) {
+                        this.#onTimerExpired();
+                    }
+                }, 1000);
+            }
+
+            #stopTimer() {
+                if (this.timerInterval) {
+                    clearInterval(this.timerInterval);
+                    this.timerInterval = null;
+                }
+            }
+
+            #updateTimer() {
+                if (!this.timerEl) return;
+
+                const minutes = Math.floor(this.timeLeft / 60);
+                const seconds = this.timeLeft % 60;
+                const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                this.timerEl.textContent = `⏱️ ${timeStr}`;
+
+                // Cambiar color cuando quede poco tiempo
+                if (this.timeLeft <= 30) {
+                    this.timerEl.classList.add('timer-warning');
+                } else if (this.timeLeft <= 60) {
+                    this.timerEl.classList.add('timer-caution');
+                    this.timerEl.classList.remove('timer-warning');
+                } else {
+                    this.timerEl.classList.remove('timer-warning', 'timer-caution');
+                }
+            }
+
+            #onTimerExpired() {
+                this.#stopTimer();
+                this.gameOver = true;
+                this.#playDeathSfx();
+
+                // Aplicar animación de muerte por tiempo
+                this.cells[this.player.r][this.player.c].classList.add("dying");
+                this.#setMessage("⏰ ¡Se acabó el tiempo! Pulsa R para reiniciar.", false);
+
+                // Remover las clases después de la animación
+                setTimeout(() => {
+                    this.cells[this.player.r][this.player.c].classList.remove("player", "armed", "dying");
+                }, 800);
+            }
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            const root = document.documentElement;
+            root.style.setProperty("--rows", ROWS);
+            root.style.setProperty("--cols", COLS);
+            new Game();
+        });
+    </script>
+
+    <style>
+        :root {
+            --cell: 18px;
+            --wall: #0d0d0d;
+            --path: #2a2a2a;
+            --player: #4a9eff;
+            --player-armed: #1e3a8a;
+            --monster: #dc2626;
+            --dagger: #7c3aed;
+            --goal: #059669;
+            --border: #000000;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #000000 0%, #0d0d0d 50%, #1a1a1a 100%);
+            color: #e0e0e0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-rows: repeat(var(--rows), var(--cell));
+            grid-template-columns: repeat(var(--cols), var(--cell));
+            gap: 0;
+            border: 4px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        /* Overlay de muerte (sangre) - por delante de todo */
+        #kill-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 180ms ease;
+            /* Fallback visual tipo "splash" con SVG embebido; sustituye por tu PNG si quieres */
+            background: center / cover no-repeat url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><radialGradient id='g' cx='50%' cy='50%' r='50%'><stop offset='0%' stop-color='%23b00020' stop-opacity='0.85'/><stop offset='80%' stop-color='%23b00020' stop-opacity='0.35'/><stop offset='100%' stop-color='%23b00020' stop-opacity='0'/></radialGradient></defs><rect width='100' height='100' fill='url(%23g)'/><g fill='%23b00020' fill-opacity='0.7'><circle cx='20' cy='30' r='8'/><circle cx='75' cy='25' r='6'/><circle cx='60' cy='70' r='9'/><circle cx='35' cy='75' r='5'/><circle cx='45' cy='50' r='12'/></g></svg>");
+            /* Puedes sobreescribir con: #kill-overlay { background-image: url("mi/sangre.png") } */
+        }
+
+        #kill-overlay.visible {
+            opacity: 1;
+        }
+
+        /* Imagen de sangre personalizada (ruta local) */
+        #kill-overlay {
+            background-image: url("img/blood.png");
+        }
+
+        .cell {
+            width: var(--cell);
+            height: var(--cell);
+        }
+
+        .wall {
+            background: var(--wall);
+            background-image:
+                linear-gradient(45deg, #1a1a1a 25%, transparent 25%),
+                linear-gradient(-45deg, #1a1a1a 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #1a1a1a 75%),
+                linear-gradient(-45deg, transparent 75%, #1a1a1a 75%);
+            background-size: 4px 4px;
+            background-position: 0 0, 0 2px, 2px -2px, -2px 0px;
+            border: 0.5px solid #000;
+        }
+
+        .path {
+            background: var(--path);
+            border: 0.5px solid #404040;
+        }
+
+        /* Muro destructible (aparece por trampas) */
+        .dwall {
+            background: #3d1b1b;
+            border: 1px solid #5a1f1f;
+            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.65);
+            position: relative;
+        }
+
+        .dwall.crack-1 {
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.7);
+        }
+
+        .dwall.crack-2 {
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+        }
+
+        .dwall.crack-3 {
+            box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.9);
+        }
+
+        /* Flash breve al golpear el muro destructible */
+        @keyframes wall-hit-flash {
+            0% {
+                box-shadow: inset 0 0 10px rgba(255, 220, 150, 0.0);
+            }
+
+            50% {
+                box-shadow: inset 0 0 16px rgba(255, 220, 150, 0.35);
+            }
+
+            100% {
+                box-shadow: inset 0 0 10px rgba(255, 220, 150, 0.0);
+            }
+        }
+
+        .dwall-hit {
+            animation: wall-hit-flash 0.18s ease-in-out;
+        }
+
+        .player {
+            background: var(--player);
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .player.armed {
+            background: var(--player-armed);
+            border-radius: 50%;
+        }
+
+        .player.armed::after {
+            content: '⚔️';
+            position: absolute;
+            top: -2px;
+            right: -2px;
+            font-size: 8px;
+        }
+
+        .monster {
+            background: var(--monster);
+            border-radius: 50%;
+            position: relative;
+        }
+
+        .monster::after {
+            content: '👹';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 10px;
+        }
+
+        .dagger {
+            background: var(--dagger);
+            border-radius: 25%;
+            position: relative;
+        }
+
+        .dagger::after {
+            content: '🗡️';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 8px;
+        }
+
+        .goal {
+            background: var(--goal);
+            border-radius: 50%;
+            position: relative;
+            animation: pulse 4s infinite ease-in-out;
+        }
+
+        .goal::after {
+            content: '🚪';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 10px;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.85;
+            }
+        }
+
+        /* Animación de muerte */
+        @keyframes death {
+            0% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+                background: var(--player);
+            }
+
+            25% {
+                transform: scale(1.3) rotate(90deg);
+                opacity: 0.8;
+                background: #ff4444;
+            }
+
+            50% {
+                transform: scale(0.8) rotate(180deg);
+                opacity: 0.6;
+                background: #cc0000;
+            }
+
+            75% {
+                transform: scale(1.2) rotate(270deg);
+                opacity: 0.3;
+                background: #880000;
+            }
+
+            100% {
+                transform: scale(0) rotate(360deg);
+                opacity: 0;
+                background: #440000;
+            }
+        }
+
+        .player.dying {
+            animation: death 0.8s ease-in-out forwards;
+        }
+
+        /* Animación de combate exitoso */
+        @keyframes combat-victory {
+            0% {
+                transform: scale(1);
+                background: var(--player-armed);
+                box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.2);
+            }
+
+            50% {
+                transform: scale(1.4);
+                background: #00ff00;
+                box-shadow: 0 0 15px #00ff00;
+            }
+
+            100% {
+                transform: scale(1);
+                background: var(--player);
+                box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.2);
+            }
+        }
+
+        .player.combat-victory {
+            animation: combat-victory 0.6s ease-in-out;
+        }
+
+        /* Animación de monstruo muriendo */
+        @keyframes monster-death {
+            0% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+                background: var(--monster);
+            }
+
+            50% {
+                transform: scale(1.3) rotate(180deg);
+                opacity: 0.5;
+                background: #ff8800;
+            }
+
+            100% {
+                transform: scale(0) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        .monster.dying {
+            animation: monster-death 0.5s ease-in-out forwards;
+        }
+
+        .timer {
+            margin-bottom: 15px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: 2px solid #333;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.7);
+            font-weight: bold;
+            font-size: 18px;
+            text-align: center;
+            color: #4a9eff;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s ease;
+        }
+
+        .timer.timer-caution {
+            color: #ffa500;
+            border-color: #ff8c00;
+            box-shadow: 0 0 15px rgba(255, 140, 0, 0.3);
+        }
+
+        .timer.timer-warning {
+            color: #ff4444;
+            border-color: #cc0000;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.5);
+            animation: timer-pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes timer-pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 0.85;
+            }
+        }
+
+        .overlay {
+            margin-top: 15px;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 2px solid #222;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+            font-weight: bold;
+            text-align: center;
+            min-width: 300px;
+            color: #f0f0f0;
+        }
+
+        /* --- Mejoras visuales del laberinto --- */
+        .grid {
+            box-shadow:
+                0 0 30px rgba(0, 0, 0, 0.8),
+                inset 0 0 10px rgba(0, 0, 0, 0.5);
+            /* sombra externa e interna para profundidad */
+        }
+
+        /* 🔹 Hacemos el laberinto más bonito */
+        .cell {
+            transition: background 0.1s ease;
+        }
+
+        /* 🔹 Luces suaves al pasar o moverse */
+        .player,
+        .monster,
+        .dagger,
+        .goal {
+            box-shadow: inset 0 0 4px rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Indicio sutil de trampa: pequeño destello tenue en el centro */
+        .cell.trap-hint {
+            position: relative;
+        }
+
+        .cell.trap-hint::after {
+            content: '';
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 230, 150, 0.5) 0%, rgba(255, 200, 120, 0.25) 55%, rgba(255, 200, 120, 0) 70%);
+            filter: drop-shadow(0 0 2px rgba(255, 200, 120, 0.2));
+            animation: trap-glint 2.8s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes trap-glint {
+
+            0%,
+            100% {
+                opacity: 0.15;
+                transform: translate(-50%, -50%) scale(1);
+            }
+
+            50% {
+                opacity: 0.35;
+                transform: translate(-50%, -50%) scale(1.15);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main id="game">
+        <div id="timer" class="timer">⏱️ 3:00</div>
+        <div id="maze" class="grid"></div>
+        <div id="message" class="overlay" hidden></div>
+        <!-- Overlay de sangre: puedes cambiarlo por tu PNG usando CSS o añadiendo background-image -->
+        <div id="kill-overlay" aria-hidden="true"></div>
+        <!-- Sonido al matar enemigo: coloca tu archivo en img/kill.mp3 o cambia la ruta -->
+        <audio id="kill-sfx" src="img/kill.mp3" preload="auto" crossorigin="anonymous"></audio>
+        <!-- Sonido al recoger puñal -->
+        <audio id="pickup-sfx" src="img/pickup.mp3" preload="auto" crossorigin="anonymous"></audio>
+        <!-- Sonido al morir el jugador -->
+        <audio id="death-sfx" src="img/death.mp3" preload="auto" crossorigin="anonymous"></audio>
+    </main>
+</body>
+
+</html>
