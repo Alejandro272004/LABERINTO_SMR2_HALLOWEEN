@@ -308,6 +308,28 @@
         dibujarLaberinto();
         setInterval(moverEnemigos, 500);
     </script>
+
+    <!-- Animación inicial de apagado de luces -->
+    <script>
+        window.addEventListener('load', () => {
+            const pasos = [
+                { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 }, { x: 4, y: 1 }, { x: 5, y: 1 },
+                { x: 5, y: 2 }, { x: 5, y: 3 }, { x: 5, y: 4 }, { x: 5, y: 5 }
+            ]; // recorrido ejemplo
+            let i = 0;
+            const interval = setInterval(() => {
+                if (i > 0) {
+                    const prev = document.querySelector(`.celda:nth-child(${(pasos[i - 1].y * 21 + pasos[i - 1].x + 1)})`);
+                    if (prev) prev.style.background = '#000a15'; // efecto "apagado"
+                }
+                if (i >= pasos.length) { clearInterval(interval); return; }
+                const celda = document.querySelector(`.celda:nth-child(${(pasos[i].y * 21 + pasos[i].x + 1)})`);
+                if (celda) celda.classList.add('jugador');
+                i++;
+            }, 200);
+        });
+    </script>
+
 </body>
 
 </html>
