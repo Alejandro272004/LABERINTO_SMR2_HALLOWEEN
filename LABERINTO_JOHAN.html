@@ -32,22 +32,25 @@
         }
 
         .pared {
-            background: #0e162b;
+            background: #1a2647;
         }
 
         .jugador {
-            background: #007bff;
+            background: #00a2ff;
             border-radius: 5px;
+            box-shadow: 0 0 10px #00a2ff;
         }
 
         .meta {
             background: #28a745;
             border-radius: 5px;
+            box-shadow: 0 0 10px #28a745;
         }
 
         .enemigo {
-            background: #ff0000;
+            background: #ff3030;
             border-radius: 50%;
+            box-shadow: 0 0 10px #ff0000;
         }
     </style>
 </head>
@@ -64,9 +67,8 @@
         let mapa = [];
         let jugador = { x: 1, y: 1 };
         let enemigos = [];
-        let intervaloMovimiento;
 
-        // Generar laberinto aleatorio
+        // Generar laberinto aleatorio (más abierto)
         function generarLaberinto() {
             mapa = [];
             for (let y = 0; y < filas; y++) {
@@ -76,7 +78,8 @@
                     if (x === 0 || y === 0 || x === columnas - 1 || y === filas - 1) {
                         fila.push(1);
                     } else {
-                        fila.push(Math.random() < 0.25 ? 1 : 0); // 25% de paredes
+                        // Menos paredes (15%)
+                        fila.push(Math.random() < 0.15 ? 1 : 0);
                     }
                 }
                 mapa.push(fila);
@@ -108,7 +111,7 @@
             const nx = jugador.x + dx;
             const ny = jugador.y + dy;
             if (nx < 0 || ny < 0 || nx >= columnas || ny >= filas) return;
-            if (mapa[ny][nx] === 1) return; // pared
+            if (mapa[ny][nx] === 1) return;
             jugador.x = nx;
             jugador.y = ny;
 
@@ -171,7 +174,7 @@
             return [];
         }
 
-        // Enemigos se mueven
+        // Movimiento enemigos
         function moverEnemigos() {
             for (const e of enemigos) {
                 let moved = false;
@@ -185,7 +188,10 @@
                 }
                 if (!moved) {
                     const opciones = [
-                        { x: e.x + 1, y: e.y }, { x: e.x - 1, y: e.y }, { x: e.x, y: e.y + 1 }, { x: e.x, y: e.y - 1 }
+                        { x: e.x + 1, y: e.y },
+                        { x: e.x - 1, y: e.y },
+                        { x: e.x, y: e.y + 1 },
+                        { x: e.x, y: e.y - 1 }
                     ].filter(p => p.x >= 0 && p.y >= 0 && p.x < columnas && p.y < filas && mapa[p.y][p.x] === 0);
                     if (opciones.length > 0) {
                         const move = opciones[Math.floor(Math.random() * opciones.length)];
@@ -214,7 +220,7 @@
             return false;
         }
 
-        // Colisión jugador-enemigo
+        // Colisión
         function verificarColision() {
             for (const e of enemigos) {
                 if (e.x === jugador.x && e.y === jugador.y) {
@@ -228,7 +234,7 @@
         function reiniciar() {
             generarLaberinto();
             jugador = { x: 1, y: 1 };
-            generarEnemigos(5);
+            generarEnemigos(4);
             dibujarLaberinto();
         }
 
@@ -255,9 +261,9 @@
 
         // Inicialización
         generarLaberinto();
-        generarEnemigos(5);
+        generarEnemigos(4);
         dibujarLaberinto();
-        setInterval(moverEnemigos, 400);
+        setInterval(moverEnemigos, 600); // Enemigos más lentos
     </script>
 </body>
 
