@@ -66,7 +66,7 @@
         let enemigos = [];
         let intervaloMovimiento;
 
-        // Generar laberinto
+        // Generar laberinto con backtracking
         function generarLaberinto(filas, columnas) {
             const grid = Array.from({ length: filas }, () => Array(columnas).fill(1));
 
@@ -87,10 +87,11 @@
             }
 
             tallar(1, 1);
-            grid[filas - 2][columnas - 2] = 2;
+            grid[filas - 2][columnas - 2] = 2; // Meta
             return grid;
         }
 
+        // Verifica si hay camino entre dos puntos usando BFS
         function hayCamino(mapa, startX, startY, endX, endY) {
             const visitado = Array.from({ length: filas }, () => Array(columnas).fill(false));
             const cola = [[startX, startY]];
@@ -111,10 +112,12 @@
             return false;
         }
 
+        // Generar un laberinto válido
         do {
             mapa = generarLaberinto(filas, columnas);
         } while (!hayCamino(mapa, 1, 1, columnas - 2, filas - 2));
 
+        // Generar enemigos en posiciones válidas
         function generarEnemigos(num) {
             const lista = [];
             for (let i = 0; i < num; i++) {
@@ -130,6 +133,7 @@
 
         enemigos = generarEnemigos(5);
 
+        // Dibujar laberinto
         function dibujarLaberinto() {
             laberinto.innerHTML = '';
             for (let y = 0; y < filas; y++) {
@@ -147,6 +151,7 @@
             }
         }
 
+        // Movimiento jugador
         function moverJugador(dx, dy) {
             const nuevoX = jugador.x + dx;
             const nuevoY = jugador.y + dy;
@@ -217,7 +222,7 @@
             return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
         }
 
-        // IA enemigos: patrullan aleatoriamente o persiguen si ven al jugador
+        // IA enemigos: patrulla o persigue
         function moverEnemigosIA() {
             for (const e of enemigos) {
                 let moved = false;
@@ -229,7 +234,6 @@
                         moved = true;
                     }
                 }
-                // Patrulla aleatoria si no ve al jugador
                 if (!moved) {
                     const opciones = [
                         { x: e.x + 1, y: e.y },
@@ -276,12 +280,13 @@
             }
         }
 
+        // Reiniciar el juego correctamente
         function reiniciar() {
             jugador = { x: 1, y: 1 };
-            enemigos = generarEnemigos(5);
             do {
                 mapa = generarLaberinto(filas, columnas);
             } while (!hayCamino(mapa, 1, 1, columnas - 2, filas - 2));
+            enemigos = generarEnemigos(5);
             dibujarLaberinto();
         }
 
