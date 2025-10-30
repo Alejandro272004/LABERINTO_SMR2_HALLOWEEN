@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laberinto RPG Visual con Nombres</title>
+    <title>Laberinto con Enemigos que Persiguen</title>
     <style>
         body {
             background: #0f172a;
@@ -20,7 +20,7 @@
             grid-template-columns: repeat(20, 30px);
             grid-template-rows: repeat(20, 30px);
             gap: 2px;
-            margin-bottom: 15px;
+            margin-top: 20px;
         }
 
         .celda {
@@ -43,103 +43,31 @@
             border-radius: 5px;
         }
 
-        .monstruo {
+        .enemigo {
             background: #ff0000;
             border-radius: 50%;
-        }
-
-        #stats {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 10px;
-        }
-
-        .barra {
-            width: 150px;
-            height: 20px;
-            background: #222;
-            border-radius: 5px;
-            overflow: hidden;
-        }
-
-        .vida {
-            background: #ff4d4d;
-            height: 100%;
-        }
-
-        .mana {
-            background: #4da6ff;
-            height: 100%;
-        }
-
-        #menuCombate {
-            display: none;
-            flex-direction: column;
-            gap: 10px;
-            margin-top: 10px;
-        }
-
-        #menuCombate button {
-            width: 200px;
-            padding: 10px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-
-        #infoCombate {
-            margin-top: 10px;
-            min-height: 50px;
         }
     </style>
 </head>
 
 <body>
-    <div id="stats">
-        <div>Vida:
-            <div class="barra">
-                <div id="vidaJugador" class="vida"></div>
-            </div>
-        </div>
-        <div>Mana:
-            <div class="barra">
-                <div id="manaJugador" class="mana"></div>
-            </div>
-        </div>
-    </div>
+    <h2>🏃 ¡Escapa del laberinto!</h2>
+    <p>Usa las flechas para moverte. Si un enemigo te alcanza, pierdes.</p>
 
     <div id="laberinto"></div>
-
-    <div id="infoCombate"></div>
-
-    <div id="menuCombate">
-        <button id="btnAtaque">Ataque Básico</button>
-        <button id="btnMagia">Magia (-10 Mana)</button>
-    </div>
 
     <script>
         const filas = 20;
         const columnas = 20;
         const laberinto = document.getElementById('laberinto');
-        const menuCombate = document.getElementById('menuCombate');
-        const infoCombate = document.getElementById('infoCombate');
 
         let mapa = [];
 
-        let jugador = {
-            x: 1,
-            y: 1,
-            vida: 100,
-            ataque: 10,
-            magia: 25,
-            mana: 50
-        };
+        let jugador = { x: 1, y: 1 };
+        let enemigos = [];
+        let intervaloMovimiento;
 
-        let monstruos = [];
-        let monstruoActual = null;
-        let enCombate = false;
-
-        const nombresMonstruos = ['Johan', 'Gabi', 'Santi', 'Dominic', 'Wasabi'];
-
+        // Generar laberinto aleatorio
         function generarLaberinto(filas, columnas) {
             const grid = Array.from({ length: filas }, () => Array(columnas).fill(1));
             function esValido(f, c) { return f > 0 && f < filas - 1 && c > 0 && c < columnas - 1; }
@@ -157,116 +85,48 @@
                 }
             }
             tallar(1, 1);
-            grid[filas - 3][columnas - 3] = 2;
-            grid[filas - 3][columnas - 4] = 0;
-            grid[filas - 4][columnas - 3] = 0;
+            grid[filas - 2][columnas - 2] = 2; // meta
             return grid;
         }
 
         mapa = generarLaberinto(filas, columnas);
 
-        function generarMonstruos() {
-            let lista = [];
-            for (let i = 0; i < nombresMonstruos.length; i++) {
+        // Generar enemigos aleatorios
+        function generarEnemigos(num) {
+            const lista = [];
+            for (let i = 0; i < num; i++) {
                 let x, y;
                 do {
                     x = Math.floor(Math.random() * columnas);
                     y = Math.floor(Math.random() * filas);
                 } while (mapa[y][x] !== 0 || (x === 1 && y === 1));
-                lista.push({ x, y, vida: 50 + Math.floor(Math.random() * 30), ataque: 5 + Math.floor(Math.random() * 5), nombre: nombresMonstruos[i] });
+                lista.push({ x, y });
             }
             return lista;
         }
 
-        monstruos = generarMonstruos();
+        enemigos = generarEnemigos(5);
 
+        // Dibujar laberinto
         function dibujarLaberinto() {
             laberinto.innerHTML = '';
-            for (let y = 0; y < mapa.length; y++) {
-                for (let x = 0; x < mapa[y].length; x++) {
+            for (let y = 0; y < filas; y++) {
+                for (let x = 0; x < columnas; x++) {
                     const celda = document.createElement('div');
                     celda.classList.add('celda');
                     if (mapa[y][x] === 1) celda.classList.add('pared');
                     if (mapa[y][x] === 2) celda.classList.add('meta');
                     if (x === jugador.x && y === jugador.y) celda.classList.add('jugador');
-                    for (const m of monstruos) {
-                        if (m.x === x && m.y === y) celda.classList.add('monstruo');
+                    for (const e of enemigos) {
+                        if (e.x === x && e.y === y) celda.classList.add('enemigo');
                     }
                     laberinto.appendChild(celda);
                 }
             }
-            actualizarStats();
         }
 
-        function actualizarStats() {
-            document.getElementById('vidaJugador').style.width = jugador.vida + '%';
-            document.getElementById('manaJugador').style.width = jugador.mana + '%';
-        }
-
-        function iniciarCombate(monstruo) {
-            enCombate = true;
-            monstruoActual = monstruo;
-            infoCombate.textContent = `¡Has encontrado a ${monstruo.nombre}! HP: ${monstruo.vida}`;
-            menuCombate.style.display = 'flex';
-        }
-
-        function ataqueBasico() {
-            if (!monstruoActual) return;
-            monstruoActual.vida -= jugador.ataque;
-            infoCombate.textContent = `Le hiciste ${jugador.ataque} de daño a ${monstruoActual.nombre}. HP del monstruo: ${Math.max(monstruoActual.vida, 0)}`;
-            if (monstruoActual.vida <= 0) {
-                infoCombate.textContent = `🎉 Has derrotado a ${monstruoActual.nombre}!`;
-                const index = monstruos.indexOf(monstruoActual);
-                if (index > -1) monstruos.splice(index, 1);
-                terminarCombate();
-                return;
-            }
-            contraAtaque();
-        }
-
-        function usarMagia() {
-            if (!monstruoActual) return;
-            if (jugador.mana < 10) {
-                infoCombate.textContent = 'No tienes suficiente mana';
-                return;
-            }
-            jugador.mana -= 10;
-            monstruoActual.vida -= jugador.magia;
-            infoCombate.textContent = `Le hiciste ${jugador.magia} de daño con magia a ${monstruoActual.nombre}. HP del monstruo: ${Math.max(monstruoActual.vida, 0)}`;
-            if (monstruoActual.vida <= 0) {
-                infoCombate.textContent = `🎉 Has derrotado a ${monstruoActual.nombre}!`;
-                const index = monstruos.indexOf(monstruoActual);
-                if (index > -1) monstruos.splice(index, 1);
-                terminarCombate();
-                return;
-            }
-            contraAtaque();
-        }
-
-        function contraAtaque() {
-            jugador.vida -= monstruoActual.ataque;
-            infoCombate.textContent += `\n${monstruoActual.nombre} te atacó y te hizo ${monstruoActual.ataque} daño. Vida: ${jugador.vida}`;
-            if (jugador.vida <= 0) {
-                alert('💀 Has muerto. Vuelves al inicio');
-                jugador.vida = 100;
-                jugador.mana = 50;
-                jugador.x = 1;
-                jugador.y = 1;
-                terminarCombate();
-            }
-            actualizarStats();
-        }
-
-        function terminarCombate() {
-            enCombate = false;
-            monstruoActual = null;
-            menuCombate.style.display = 'none';
-            infoCombate.textContent = '';
-            dibujarLaberinto();
-        }
-
+        // Movimiento del jugador
         function moverJugador(dx, dy) {
-            if (enCombate) return;
             const nuevoX = jugador.x + dx;
             const nuevoY = jugador.y + dy;
             if (nuevoX < 0 || nuevoY < 0 || nuevoX >= columnas || nuevoY >= filas) return;
@@ -274,31 +134,74 @@
             jugador.x = nuevoX;
             jugador.y = nuevoY;
 
-            for (const m of monstruos) {
-                if (m.x === jugador.x && m.y === jugador.y) {
-                    iniciarCombate(m);
-                    break;
-                }
-            }
-
             if (mapa[nuevoY][nuevoX] === 2) {
-                alert('🎉 ¡Has ganado el laberinto RPG!');
-                window.location.href = 'nivel2.html';
+                alert("🎉 ¡Has escapado del laberinto!");
+                reiniciar();
             }
 
+            verificarColision();
             dibujarLaberinto();
         }
 
-        document.getElementById('btnAtaque').addEventListener('click', ataqueBasico);
-        document.getElementById('btnMagia').addEventListener('click', usarMagia);
+        // Movimiento simple de enemigos hacia el jugador
+        function moverEnemigos() {
+            for (const e of enemigos) {
+                let mejorX = e.x;
+                let mejorY = e.y;
+                const opciones = [
+                    { x: e.x + 1, y: e.y },
+                    { x: e.x - 1, y: e.y },
+                    { x: e.x, y: e.y + 1 },
+                    { x: e.x, y: e.y - 1 },
+                ];
 
+                // Elegir movimiento que acerque al jugador
+                let menorDist = Infinity;
+                for (const o of opciones) {
+                    if (o.x >= 0 && o.y >= 0 && o.x < columnas && o.y < filas && mapa[o.y][o.x] !== 1) {
+                        const dist = Math.hypot(jugador.x - o.x, jugador.y - o.y);
+                        if (dist < menorDist) {
+                            menorDist = dist;
+                            mejorX = o.x;
+                            mejorY = o.y;
+                        }
+                    }
+                }
+
+                e.x = mejorX;
+                e.y = mejorY;
+            }
+
+            verificarColision();
+            dibujarLaberinto();
+        }
+
+        // Verificar si algún enemigo alcanzó al jugador
+        function verificarColision() {
+            for (const e of enemigos) {
+                if (e.x === jugador.x && e.y === jugador.y) {
+                    alert("💀 ¡Te atraparon!");
+                    reiniciar();
+                }
+            }
+        }
+
+        function reiniciar() {
+            jugador = { x: 1, y: 1 };
+            enemigos = generarEnemigos(5);
+            dibujarLaberinto();
+        }
+
+        // Controles
         document.addEventListener('keydown', e => {
-            if (enCombate) return;
             if (e.key === 'ArrowUp') moverJugador(0, -1);
             if (e.key === 'ArrowDown') moverJugador(0, 1);
             if (e.key === 'ArrowLeft') moverJugador(-1, 0);
             if (e.key === 'ArrowRight') moverJugador(1, 0);
         });
+
+        // Bucle de movimiento de enemigos
+        intervaloMovimiento = setInterval(moverEnemigos, 600);
 
         dibujarLaberinto();
     </script>
