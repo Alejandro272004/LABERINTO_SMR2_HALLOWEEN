@@ -247,7 +247,7 @@
 
             // 🔗 Redirigir a otro archivo HTML después de un pequeño efecto
             setTimeout(() => {
-                window.location.href = "LABERINTO_JOHAN.html"; // <-- cambia este nombre si quieres
+                window.location.href = "LABERINTO_JOHAN.html";
             }, 2000);
         }
 
@@ -318,6 +318,34 @@
         actualizarPosiciones();
         colocarMeta();
         iniciarTemporizador();
+    </script>
+
+    <!-- 🔥 BLOQUE AÑADIDO SIN CAMBIAR NADA DE TU CÓDIGO -->
+    <script>
+        let intentos = 0;
+
+        // Reemplazamos el temporizador después de cargar todo
+        window.addEventListener('load', () => {
+            clearInterval(intervaloTiempo);
+
+            if (intentos === 0) tiempoRestante = 30;
+            else if (intentos === 1) tiempoRestante = 60;
+            else tiempoRestante = 90;
+
+            contador.textContent = `Tiempo: ${tiempoRestante}s`;
+            iniciarTemporizador();
+        });
+
+        // Extiende el jumpscare para durar 5s y reiniciar
+        const oldJumpscare = activarJumpscare;
+        activarJumpscare = function () {
+            oldJumpscare();
+            setTimeout(() => {
+                jumpscare.style.display = 'none';
+                intentos++;
+                location.reload();
+            }, 5000);
+        };
     </script>
 
 </body>
