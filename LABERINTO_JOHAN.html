@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laberinto Dinámico con Enemigos y Portales</title>
+    <title>Laberinto Dinámico con Enemigos, Portales y Trampas</title>
     <style>
         body {
             background: #0f172a;
@@ -64,12 +64,18 @@
             border-radius: 50%;
             box-shadow: 0 0 15px #00f5d4;
         }
+
+        .trampa {
+            background: #ffdd00;
+            border-radius: 3px;
+            box-shadow: 0 0 10px #ffdd00 inset;
+        }
     </style>
 </head>
 
 <body>
-    <h2>🏃 ¡Escapa del laberinto con portales! 🌀</h2>
-    <p>Usa las flechas. Los monstruos te perseguirán si te ven.</p>
+    <h2>🏃 ¡Escapa del laberinto con portales y trampas! 🌀</h2>
+    <p>Usa las flechas. Pulsa Espacio para colocar trampas. Los monstruos te perseguirán si te ven.</p>
     <div id="laberinto"></div>
 
     <script>
@@ -81,11 +87,12 @@
         let enemigos = [];
         let portalA = null;
         let portalB = null;
+        let trampas = [];
+        let maxTrampas = 3;
 
         // ---------- generador de laberinto (DFS) ----------
         function generarLaberinto() {
             mapa = Array.from({ length: filas }, () => Array(columnas).fill(1));
-
             function tallar(x, y) {
                 const dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]].sort(() => Math.random() - 0.5);
                 for (const [dx, dy] of dirs) {
@@ -97,7 +104,6 @@
                     }
                 }
             }
-
             mapa[1][1] = 0;
             tallar(1, 1);
             mapa[filas - 2][columnas - 2] = 2;
@@ -126,6 +132,9 @@
                     if (mapa[y][x] === 2) celda.classList.add('meta');
                     if (portalA && x === portalA.x && y === portalA.y) celda.classList.add('portalA');
                     if (portalB && x === portalB.x && y === portalB.y) celda.classList.add('portalB');
+                    for (const t of trampas) {
+                        if (t.x === x && t.y === y) celda.classList.add('trampa');
+                    }
                     if (x === jugador.x && y === jugador.y) celda.classList.add('jugador');
                     for (const e of enemigos) {
                         if (e.x === x && e.y === y) celda.classList.add('enemigo');
@@ -143,25 +152,29 @@
             jugador.x = nx; jugador.y = ny;
 
             // Portales
-            if (portalA && jugador.x === portalA.x && jugador.y === portalA.y) {
-                jugador.x = portalB.x;
-                jugador.y = portalB.y;
-            }
-            if (portalB && jugador.x === portalB.x && jugador.y === portalB.y) {
-                jugador.x = portalA.x;
-                jugador.y = portalA.y;
-            }
+            if (portalA && jugador.x === portalA.x && jugador.y === portalA.y) { jugador.x = portalB.x; jugador.y = portalB.y; }
+            if (portalB && jugador.x === portalB.x && jugador.y === portalB.y) { jugador.x = portalA.x; jugador.y = portalA.y; }
 
-            if (mapa[ny][nx] === 2) {
-                alert('🎉 ¡Has ganado!');
-                reiniciar();
-            }
+            if (mapa[ny][nx] === 2) { alert('🎉 ¡Has ganado!'); reiniciar(); }
 
             verificarColision();
             dibujarLaberinto();
         }
 
-        // ---------- BFS limitado para enemigos ----------
+        // ---------- colocar trampa ----------
+        function colocarTrampa() {
+            if (trampas.length >= maxTrampas) return;
+            const ocupado = mapa[jugador.y][jugador.x] === 1 ||
+                (portalA && jugador.x === portalA.x && jugador.y === portalA.y) ||
+                (portalB && jugador.x === portalB.x && jugador.y === portalB.y) ||
+                enemigos.some(e => e.x === jugador.x && e.y === jugador.y) ||
+                trampas.some(t => t.x === jugador.x && t.y === jugador.y);
+            if (ocupado) return;
+            trampas.push({ x: jugador.x, y: jugador.y });
+            dibujarLaberinto();
+        }
+
+        // ---------- BFS limitado ----------
         function bfsPrimerPasoLimitado(inicio, objetivo, maxDist = 8, maxNodes = 300) {
             const h = p => `${p.x},${p.y}`;
             const queue = [inicio];
@@ -174,7 +187,6 @@
                 const cur = queue.shift();
                 nodes++;
                 if (nodes > maxNodes) break;
-
                 const distFromStart = Math.abs(cur.x - inicio.x) + Math.abs(cur.y - inicio.y);
                 if (distFromStart > maxDist) continue;
 
@@ -264,7 +276,7 @@
         }
 
         function moverEnemigos() {
-            for (const e of enemigos) {
+            for (const e of enemigos.slice()) {
                 let moved = false;
                 if (lineaVision(e, jugador)) {
                     const paso = bfsPrimerPasoLimitado({ x: e.x, y: e.y }, jugador, 10, 800);
@@ -288,9 +300,19 @@
                     e.state = 'idle';
                 }
 
-                // enemigos usan portales también
+                // Portales
                 if (portalA && e.x === portalA.x && e.y === portalA.y) { e.x = portalB.x; e.y = portalB.y; }
                 if (portalB && e.x === portalB.x && e.y === portalB.y) { e.x = portalA.x; e.y = portalA.y; }
+
+                // Trampas
+                for (let i = trampas.length - 1; i >= 0; i--) {
+                    const t = trampas[i];
+                    if (e.x === t.x && e.y === t.y) {
+                        enemigos.splice(enemigos.indexOf(e), 1); // enemigo muerto
+                        trampas.splice(i, 1); // trampa consumida
+                        break;
+                    }
+                }
             }
             verificarColision();
             dibujarLaberinto();
@@ -308,6 +330,7 @@
             jugador = { x: 1, y: 1 };
             generarEnemigos(4);
             generarPortales();
+            trampas = [];
             dibujarLaberinto();
         }
 
@@ -317,6 +340,7 @@
             if (e.key === 'ArrowDown') moverJugador(0, 1);
             if (e.key === 'ArrowLeft') moverJugador(-1, 0);
             if (e.key === 'ArrowRight') moverJugador(1, 0);
+            if (e.code === 'Space') colocarTrampa();
         });
 
         // ---------- inicialización ----------
