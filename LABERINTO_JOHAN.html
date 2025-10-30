@@ -123,7 +123,10 @@
             if (mapa[ny][nx] === 1) return;
             jugador.x = nx; jugador.y = ny;
 
-            if (mapa[ny][nx] === 2) { alert('🎉 ¡Has ganado!'); reiniciar(); }
+            if (mapa[ny][nx] === 2) {
+                // Cuando pases la meta verde, ir a index2.html
+                window.location.href = 'index2.html';
+            }
 
             verificarColision();
             dibujarLaberinto();
@@ -270,8 +273,8 @@
                 for (let i = trampas.length - 1; i >= 0; i--) {
                     const t = trampas[i];
                     if (e.x === t.x && e.y === t.y) {
-                        enemigos.splice(enemigos.indexOf(e), 1); // enemigo muerto
-                        trampas.splice(i, 1); // trampa consumida
+                        enemigos.splice(enemigos.indexOf(e), 1);
+                        trampas.splice(i, 1);
                         break;
                     }
                 }
