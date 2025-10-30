@@ -322,9 +322,9 @@
 
     <!-- 🔥 BLOQUE AÑADIDO SIN CAMBIAR NADA DE TU CÓDIGO -->
     <script>
-        let intentos = 0;
+        // ✅ Bloque mejorado con localStorage (mantiene los intentos tras reiniciar)
+        let intentos = parseInt(localStorage.getItem("intentos")) || 0;
 
-        // Reemplazamos el temporizador después de cargar todo
         window.addEventListener('load', () => {
             clearInterval(intervaloTiempo);
 
@@ -336,13 +336,13 @@
             iniciarTemporizador();
         });
 
-        // Extiende el jumpscare para durar 5s y reiniciar
         const oldJumpscare = activarJumpscare;
         activarJumpscare = function () {
             oldJumpscare();
             setTimeout(() => {
                 jumpscare.style.display = 'none';
                 intentos++;
+                localStorage.setItem("intentos", intentos);
                 location.reload();
             }, 5000);
         };
