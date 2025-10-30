@@ -18,7 +18,7 @@
         const DWALL_HITS = 3;             // Golpes para romper un muro destructible
         const TRAP_HINTS = true;          // Mostrar indicios sutiles de trampas
         const TRAP_HINT_RADIUS = 2;       // Radio (Manhattan) para mostrar indicio cerca del jugador
-        const TIMER_DURATION = 180;       // 3 minutos en segundos (180)
+        const TIMER_DURATION = 20;       // 3 minutos en segundos (180)
 
         // Utilidades básicas
         const inBounds = (r, c) => r >= 0 && c >= 0 && r < ROWS && c < COLS;
@@ -100,6 +100,12 @@
                 this.aggroTurns = 0;               // Turnos de aggro global tras trampa
                 this.destructWalls = new Map();    // key -> golpesRestantes
                 this.traps = [];                   // {r,c,armed}
+                
+                // Sistema avanzado de control de movimiento
+                this.lastMoveTime = 0;             // Último tiempo de movimiento
+                this.moveDelay = 200;              // 200ms entre movimientos (más lento para evitar spam)
+                this.keysPressed = new Set();      // Teclas actualmente presionadas
+                this.keyRepeatBlocked = new Set(); // Teclas bloqueadas por repetición
                 this.cells = [];
                 this.maze = null;
                 this.player = null;
@@ -132,6 +138,11 @@
                 this.destructWalls.clear();
                 this.traps = [];
                 this.#setMessage("", true);
+
+                // Resetear sistema de control de movimiento
+                this.lastMoveTime = 0;
+                this.keysPressed.clear();
+                this.keyRepeatBlocked.clear();
 
                 // Reiniciar temporizador
                 this.timeLeft = TIMER_DURATION;
@@ -322,8 +333,9 @@
                 }
             }
 
-            // NUEVO SISTEMA DE MOVIMIENTO DEL JUGADOR
+            // SISTEMA AVANZADO DE MOVIMIENTO CON CONTROL ANTI-SPAM
             #bindInput() {
+                // Evento cuando se presiona una tecla
                 window.addEventListener("keydown", (e) => {
                     // Activar audio con la primera interacción
                     if (!this.audioInitialized) {
@@ -341,15 +353,33 @@
                     if (this.gameOver) return;
 
                     // Obtener dirección del movimiento
-                    console.log(`🎮 Tecla presionada: "${e.key}"`);
                     const direction = getDirection(e.key);
-                    if (!direction) {
-                        console.log(`❌ Tecla no reconocida: "${e.key}"`);
+                    if (!direction) return;
+
+                    // CONTROL ANTI-SPAM MEJORADO
+                    const currentTime = Date.now();
+                    const keyId = e.key.toLowerCase();
+                    
+                    // Si la tecla ya está siendo presionada (repeat), bloquear
+                    if (this.keysPressed.has(keyId)) {
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    // Si no ha pasado suficiente tiempo desde el último movimiento
+                    if (currentTime - this.lastMoveTime < this.moveDelay) {
+                        e.preventDefault();
                         return;
                     }
 
-                    console.log(`🎯 Dirección detectada: ${direction.name} (${direction.dr}, ${direction.dc})`);
+                    // Marcar tecla como presionada
+                    this.keysPressed.add(keyId);
+                    
+                    console.log(`🎮 Movimiento válido: ${direction.name}`);
                     e.preventDefault();
+                    
+                    // Actualizar tiempo del último movimiento
+                    this.lastMoveTime = currentTime;
                     // Intentar mover jugador
                     const moved = this.#movePlayer(direction.dr, direction.dc);
                     if (moved || this._consumedTurn) {
@@ -375,6 +405,16 @@
                         this.#updateDisplay();
                         // Limpiar bandera de turno consumido por golpe a muro
                         this._consumedTurn = false;
+                    }
+                });
+
+                // Evento cuando se suelta una tecla (crucial para evitar repetición automática)
+                window.addEventListener("keyup", (e) => {
+                    const direction = getDirection(e.key);
+                    if (direction) {
+                        const keyId = e.key.toLowerCase();
+                        this.keysPressed.delete(keyId);
+                        console.log(`🔓 Tecla liberada: ${e.key}`);
                     }
                 });
 
