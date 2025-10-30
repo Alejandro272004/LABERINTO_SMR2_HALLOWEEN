@@ -18,7 +18,7 @@
         const DWALL_HITS = 3;             // Golpes para romper un muro destructible
         const TRAP_HINTS = true;          // Mostrar indicios sutiles de trampas
         const TRAP_HINT_RADIUS = 2;       // Radio (Manhattan) para mostrar indicio cerca del jugador
-        const TIMER_DURATION = 20;       // 3 minutos en segundos (180)
+        const TIMER_DURATION = 18;       // 3 minutos en segundos (180)
 
         // Utilidades básicas
         const inBounds = (r, c) => r >= 0 && c >= 0 && r < ROWS && c < COLS;
@@ -1691,7 +1691,7 @@
         <div id="kill-overlay" aria-hidden="true"></div>
         <!-- Overlay de jumpscare cuando se acaba el tiempo -->
         <div id="jumpscare-overlay" aria-hidden="true">
-            <img id="jumpscare-img" src="jumpscare.png" alt="Jumpscare" style="max-width: 80vw; max-height: 80vh; object-fit: contain;">
+            <img id="jumpscare-img" src="img/jumpscare.png" alt="Jumpscare" style="max-width: 80vw; max-height: 80vh; object-fit: contain;">
         </div>
         <!-- Sonido al matar enemigo: coloca tu archivo en img/kill.mp3 o cambia la ruta -->
         <audio id="kill-sfx" src="img/kill.mp3" preload="auto" crossorigin="anonymous"></audio>
@@ -1700,7 +1700,7 @@
         <!-- Sonido al morir el jugador -->
         <audio id="death-sfx" src="img/death.mp3" preload="auto" crossorigin="anonymous"></audio>
         <!-- Sonido de jumpscare -->
-        <audio id="jumpscare-sfx" src="jumpscare.mp3" preload="auto" crossorigin="anonymous"></audio>
+        <audio id="jumpscare-sfx" src="img/jumpscare.mp3" preload="auto" crossorigin="anonymous"></audio>
     </main>
 </body>
 
