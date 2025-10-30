@@ -1,305 +1,313 @@
 <!DOCTYPE html>
-    <html lang="es">
+<html lang="es">
 
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Laberinto Dinámico con Enemigos y Trampas</title>
-        <style>
-            body {
-                background: #0f172a;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                flex-direction: column;
-                min-height: 100vh;
-                font-family: sans-serif;
-                color: white;
-            }
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laberinto Dinámico con Enemigos y Trampas</title>
+    <style>
+        body {
+            background: #0f172a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+            font-family: sans-serif;
+            color: white;
+        }
 
-            #laberinto {
-                display: grid;
-                grid-template-columns: repeat(21, 30px);
-                grid-template-rows: repeat(21, 30px);
-                gap: 2px;
-                margin-top: 20px;
-            }
+        #laberinto {
+            display: grid;
+            grid-template-columns: repeat(21, 30px);
+            grid-template-rows: repeat(21, 30px);
+            gap: 2px;
+            margin-top: 20px;
+        }
 
-            .celda {
-                width: 30px;
-                height: 30px;
-                background: #0f172a;
-            }
+        .celda {
+            width: 30px;
+            height: 30px;
+            background: #0f172a;
+        }
 
-            .pared {
-                background: #1a2647;
-            }
+        .pared {
+            background: #1a2647;
+        }
 
-            .jugador {
-                background: #00a2ff;
-                border-radius: 5px;
-                box-shadow: 0 0 10px #00a2ff;
-            }
+        .jugador {
+            background: #00a2ff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px #00a2ff;
+        }
 
-            .meta {
-                background: #28a745;
-                border-radius: 5px;
-                box-shadow: 0 0 10px #28a745;
-            }
+        .meta {
+            background: #28a745;
+            border-radius: 5px;
+            box-shadow: 0 0 10px #28a745;
+        }
 
-            .enemigo {
-                background: #ff3030;
-                border-radius: 50%;
-                box-shadow: 0 0 10px #ff0000;
-            }
+        .enemigo {
+            background: #ff3030;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #ff0000;
+        }
 
-            .trampa {
-                background: #ffdd00;
-                border-radius: 3px;
-                box-shadow: 0 0 10px #ffdd00 inset;
-            }
-        </style>
-    </head>
+        .trampa {
+            background: #ffdd00;
+            border-radius: 3px;
+            box-shadow: 0 0 10px #ffdd00 inset;
+        }
+    </style>
+</head>
 
-    <body>
-        <h2>🏃 ¡Escapa del laberinto con trampas! 🛑</h2>
-        <p>Usa las flechas. Pulsa Espacio para colocar trampas. Los monstruos te perseguirán si te ven.</p>
-        <div id="laberinto"></div>
+<body>
+    <h2>🏃 ¡Escapa del laberinto con trampas! 🛑</h2>
+    <p>Usa las flechas. Pulsa Espacio para colocar trampas. Los monstruos te perseguirán si te ven.</p>
+    <div id="laberinto"></div>
 
-        <script>
-            const filas = 21;
-            const columnas = 21;
-            const laberinto = document.getElementById('laberinto');
-            let mapa = [];
-            let jugador = { x: 1, y: 1 };
-            let enemigos = [];
-            let trampas = [];
-            let maxTrampas = 3;
+    <script>
+        const filas = 21;
+        const columnas = 21;
+        const laberinto = document.getElementById('laberinto');
+        let mapa = [];
+        let jugador = { x: 1, y: 1 };
+        let enemigos = [];
+        let trampas = [];
+        let maxTrampas = 3;
 
-            function generarLaberinto() {
-                mapa = Array.from({ length: filas }, () => Array(columnas).fill(1));
-                function tallar(x, y) {
-                    const dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]].sort(() => Math.random() - 0.5);
-                    for (const [dx, dy] of dirs) {
-                        const nx = x + dx, ny = y + dy;
-                        if (nx > 0 && ny > 0 && nx < columnas - 1 && ny < filas - 1 && mapa[ny][nx] === 1) {
-                            mapa[y + dy / 2][x + dx / 2] = 0;
-                            mapa[ny][nx] = 0;
-                            tallar(nx, ny);
-                        }
-                    }
-                }
-                mapa[1][1] = 0;
-                tallar(1, 1);
-                mapa[filas - 2][columnas - 2] = 2;
-            }
-
-            function dibujarLaberinto() {
-                laberinto.innerHTML = '';
-                for (let y = 0; y < filas; y++) {
-                    for (let x = 0; x < columnas; x++) {
-                        const celda = document.createElement('div');
-                        celda.className = 'celda';
-                        if (mapa[y][x] === 1) celda.classList.add('pared');
-                        if (mapa[y][x] === 2) celda.classList.add('meta');
-                        for (const t of trampas) {
-                            if (t.x === x && t.y === y) celda.classList.add('trampa');
-                        }
-                        if (x === jugador.x && y === jugador.y) celda.classList.add('jugador');
-                        for (const e of enemigos) {
-                            if (e.x === x && e.y === y) celda.classList.add('enemigo');
-                        }
-                        laberinto.appendChild(celda);
-                    }
-                }
-            }
-
-            function moverJugador(dx, dy) {
-                const nx = jugador.x + dx, ny = jugador.y + dy;
-                if (nx < 0 || ny < 0 || nx >= columnas || ny >= filas) return;
-                if (mapa[ny][nx] === 1) return;
-                jugador.x = nx; jugador.y = ny;
-
-                if (mapa[ny][nx] === 2) {
-                    // Redirigir al archivo solicitado
-                    window.location.href = 'LABERINTO_ALEJANDRO_GONZALEZ.html';
-                }
-
-                verificarColision();
-                dibujarLaberinto();
-            }
-
-            function colocarTrampa() {
-                if (trampas.length >= maxTrampas) return;
-                const ocupado = mapa[jugador.y][jugador.x] === 1 ||
-                    enemigos.some(e => e.x === jugador.x && e.y === jugador.y) ||
-                    trampas.some(t => t.x === jugador.x && t.y === jugador.y);
-                if (ocupado) return;
-                trampas.push({ x: jugador.x, y: jugador.y });
-                dibujarLaberinto();
-            }
-
-            function bfsPrimerPasoLimitado(inicio, objetivo, maxDist = 8, maxNodes = 300) {
-                const h = p => `${p.x},${p.y}`;
-                const queue = [inicio];
-                const parent = new Map();
-                const visited = new Set([h(inicio)]);
-                parent.set(h(inicio), null);
-                let nodes = 0;
-
-                while (queue.length) {
-                    const cur = queue.shift();
-                    nodes++;
-                    if (nodes > maxNodes) break;
-                    const distFromStart = Math.abs(cur.x - inicio.x) + Math.abs(cur.y - inicio.y);
-                    if (distFromStart > maxDist) continue;
-
-                    if (cur.x === objetivo.x && cur.y === objetivo.y) {
-                        let stepHash = h(cur);
-                        let prevHash = parent.get(stepHash);
-                        if (prevHash === null) return null;
-                        while (parent.get(prevHash) !== null) {
-                            stepHash = prevHash;
-                            prevHash = parent.get(stepHash);
-                        }
-                        const [sx, sy] = stepHash.split(',').map(Number);
-                        return { x: sx, y: sy };
-                    }
-
-                    const vecinos = [
-                        { x: cur.x + 1, y: cur.y },
-                        { x: cur.x - 1, y: cur.y },
-                        { x: cur.x, y: cur.y + 1 },
-                        { x: cur.x, y: cur.y - 1 }
-                    ];
-
-                    for (const v of vecinos) {
-                        if (v.x < 0 || v.y < 0 || v.x >= columnas || v.y >= filas) continue;
-                        if (mapa[v.y][v.x] === 1) continue;
-                        const vh = h(v);
-                        if (visited.has(vh)) continue;
-                        visited.add(vh);
-                        parent.set(vh, h(cur));
-                        queue.push(v);
-                    }
-                }
-                return null;
-            }
-
-            function lineaVision(enemigo, jugador, maxVision = 7) {
-                const dist = Math.abs(enemigo.x - jugador.x) + Math.abs(enemigo.y - jugador.y);
-                if (dist > maxVision) return false;
-                if (enemigo.x === jugador.x) {
-                    const minY = Math.min(enemigo.y, jugador.y), maxY = Math.max(enemigo.y, jugador.y);
-                    for (let y = minY + 1; y < maxY; y++) if (mapa[y][enemigo.x] === 1) return false;
-                    return true;
-                }
-                if (enemigo.y === jugador.y) {
-                    const minX = Math.min(enemigo.x, jugador.x), maxX = Math.max(enemigo.x, jugador.x);
-                    for (let x = minX + 1; x < maxX; x++) if (mapa[enemigo.y][x] === 1) return false;
-                    return true;
-                }
-                return false;
-            }
-
-            function generarEnemigos(num) {
-                enemigos = [];
-                for (let i = 0; i < num; i++) {
-                    let x, y;
-                    do {
-                        x = Math.floor(Math.random() * columnas);
-                        y = Math.floor(Math.random() * filas);
-                    } while (mapa[y][x] !== 0 || (x === 1 && y === 1) || (x === columnas - 2 && y === filas - 2));
-                    enemigos.push({ x, y, state: 'idle', idleTarget: null, lastPos: null });
-                }
-            }
-
-            function vecinosLibres(x, y) {
-                const arr = [];
-                const cand = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-                for (const [dx, dy] of cand) {
+        function generarLaberinto() {
+            mapa = Array.from({ length: filas }, () => Array(columnas).fill(1));
+            function tallar(x, y) {
+                const dirs = [[2, 0], [-2, 0], [0, 2], [0, -2]].sort(() => Math.random() - 0.5);
+                for (const [dx, dy] of dirs) {
                     const nx = x + dx, ny = y + dy;
-                    if (nx >= 0 && ny >= 0 && nx < columnas && ny < filas && mapa[ny][nx] === 0) arr.push({ x: nx, y: ny });
-                }
-                return arr;
-            }
-
-            function randomAccessibleCell() {
-                for (let tries = 0; tries < 50; tries++) {
-                    const rx = Math.floor(Math.random() * columnas);
-                    const ry = Math.floor(Math.random() * filas);
-                    if (mapa[ry][rx] === 0) return { x: rx, y: ry };
-                }
-                for (let y = 0; y < filas; y++)
-                    for (let x = 0; x < columnas; x++)
-                        if (mapa[y][x] === 0) return { x, y };
-                return { x: 1, y: 1 };
-            }
-
-            function moverEnemigos() {
-                for (const e of enemigos.slice()) {
-                    let moved = false;
-                    if (lineaVision(e, jugador)) {
-                        const paso = bfsPrimerPasoLimitado({ x: e.x, y: e.y }, jugador, 10, 800);
-                        if (paso) { e.lastPos = { x: e.x, y: e.y }; e.x = paso.x; e.y = paso.y; moved = true; e.state = 'chase'; }
-                    }
-                    if (!moved) {
-                        if (!e.idleTarget || (e.idleTarget && e.x === e.idleTarget.x && e.y === e.idleTarget.y))
-                            e.idleTarget = randomAccessibleCell();
-                        const pasoIdle = bfsPrimerPasoLimitado({ x: e.x, y: e.y }, e.idleTarget, 12, 500);
-                        if (pasoIdle) {
-                            if (e.lastPos && pasoIdle.x === e.lastPos.x && pasoIdle.y === e.lastPos.y) {
-                                const opciones = vecinosLibres(e.x, e.y).filter(p => !(e.lastPos && p.x === e.lastPos.x && p.y === e.lastPos.y));
-                                if (opciones.length > 0) { const mv = opciones[Math.floor(Math.random() * opciones.length)]; e.lastPos = { x: e.x, y: e.y }; e.x = mv.x; e.y = mv.y; moved = true; }
-                                else { e.lastPos = { x: e.x, y: e.y }; e.x = pasoIdle.x; e.y = pasoIdle.y; moved = true; }
-                            } else { e.lastPos = { x: e.x, y: e.y }; e.x = pasoIdle.x; e.y = pasoIdle.y; moved = true; }
-                        } else {
-                            const opciones = vecinosLibres(e.x, e.y).filter(p => !(e.lastPos && p.x === e.lastPos.x && p.y === e.lastPos.y));
-                            if (opciones.length === 0) { const allOps = vecinosLibres(e.x, e.y); if (allOps.length > 0) { const mv = allOps[Math.floor(Math.random() * allOps.length)]; e.lastPos = { x: e.x, y: e.y }; e.x = mv.x; e.y = mv.y; moved = true; } }
-                            else { const mv = opciones[Math.floor(Math.random() * opciones.length)]; e.lastPos = { x: e.x, y: e.y }; e.x = mv.x; e.y = mv.y; moved = true; }
-                        }
-                        e.state = 'idle';
-                    }
-
-                    for (let i = trampas.length - 1; i >= 0; i--) {
-                        const t = trampas[i];
-                        if (e.x === t.x && e.y === t.y) {
-                            enemigos.splice(enemigos.indexOf(e), 1);
-                            trampas.splice(i, 1);
-                            break;
-                        }
+                    if (nx > 0 && ny > 0 && nx < columnas - 1 && ny < filas - 1 && mapa[ny][nx] === 1) {
+                        mapa[y + dy / 2][x + dx / 2] = 0;
+                        mapa[ny][nx] = 0;
+                        tallar(nx, ny);
                     }
                 }
-                verificarColision();
-                dibujarLaberinto();
+            }
+            mapa[1][1] = 0;
+            tallar(1, 1);
+            mapa[filas - 2][columnas - 2] = 2;
+        }
+
+        function dibujarLaberinto() {
+            laberinto.innerHTML = '';
+            for (let y = 0; y < filas; y++) {
+                for (let x = 0; x < columnas; x++) {
+                    const celda = document.createElement('div');
+                    celda.className = 'celda';
+                    if (mapa[y][x] === 1) celda.classList.add('pared');
+                    if (mapa[y][x] === 2) celda.classList.add('meta');
+                    for (const t of trampas) {
+                        if (t.x === x && t.y === y) celda.classList.add('trampa');
+                    }
+                    if (x === jugador.x && y === jugador.y) celda.classList.add('jugador');
+                    for (const e of enemigos) {
+                        if (e.x === x && e.y === y) celda.classList.add('enemigo');
+                    }
+                    laberinto.appendChild(celda);
+                }
+            }
+        }
+
+        function moverJugador(dx, dy) {
+            const nx = jugador.x + dx, ny = jugador.y + dy;
+            if (nx < 0 || ny < 0 || nx >= columnas || ny >= filas) return;
+            if (mapa[ny][nx] === 1) return;
+            jugador.x = nx; jugador.y = ny;
+
+            // Verificar si el jugador pisa su propia trampa
+            for (let i = 0; i < trampas.length; i++) {
+                if (trampas[i].x === jugador.x && trampas[i].y === jugador.y) {
+                    alert('💀 ¡Pisaste tu propia trampa!');
+                    reiniciar();
+                    return;
+                }
             }
 
-            function verificarColision() {
-                for (const e of enemigos)
-                    if (e.x === jugador.x && e.y === jugador.y) { alert('💀 ¡Te atraparon!'); reiniciar(); }
+            if (mapa[ny][nx] === 2) {
+                window.location.href = 'LABERINTO_ALEJANDRO_GONZALEZ.html';
             }
 
-            function reiniciar() {
-                generarLaberinto();
-                jugador = { x: 1, y: 1 };
-                generarEnemigos(4);
-                trampas = [];
-                dibujarLaberinto();
-            }
-
-            document.addEventListener('keydown', e => {
-                if (e.key === 'ArrowUp') moverJugador(0, -1);
-                if (e.key === 'ArrowDown') moverJugador(0, 1);
-                if (e.key === 'ArrowLeft') moverJugador(-1, 0);
-                if (e.key === 'ArrowRight') moverJugador(1, 0);
-                if (e.code === 'Space') colocarTrampa();
-            });
-
-            generarLaberinto();
-            generarEnemigos(4);
+            verificarColision();
             dibujarLaberinto();
-            setInterval(moverEnemigos, 500);
-        </script>
-    </body>
+        }
 
-    </html>
+        function colocarTrampa() {
+            if (trampas.length >= maxTrampas) return;
+            const ocupado = mapa[jugador.y][jugador.x] === 1 ||
+                enemigos.some(e => e.x === jugador.x && e.y === jugador.y) ||
+                trampas.some(t => t.x === jugador.x && t.y === jugador.y);
+            if (ocupado) return;
+            trampas.push({ x: jugador.x, y: jugador.y });
+            dibujarLaberinto();
+        }
+
+        function bfsPrimerPasoLimitado(inicio, objetivo, maxDist = 8, maxNodes = 300) {
+            const h = p => `${p.x},${p.y}`;
+            const queue = [inicio];
+            const parent = new Map();
+            const visited = new Set([h(inicio)]);
+            parent.set(h(inicio), null);
+            let nodes = 0;
+
+            while (queue.length) {
+                const cur = queue.shift();
+                nodes++;
+                if (nodes > maxNodes) break;
+                const distFromStart = Math.abs(cur.x - inicio.x) + Math.abs(cur.y - inicio.y);
+                if (distFromStart > maxDist) continue;
+
+                if (cur.x === objetivo.x && cur.y === objetivo.y) {
+                    let stepHash = h(cur);
+                    let prevHash = parent.get(stepHash);
+                    if (prevHash === null) return null;
+                    while (parent.get(prevHash) !== null) {
+                        stepHash = prevHash;
+                        prevHash = parent.get(stepHash);
+                    }
+                    const [sx, sy] = stepHash.split(',').map(Number);
+                    return { x: sx, y: sy };
+                }
+
+                const vecinos = [
+                    { x: cur.x + 1, y: cur.y },
+                    { x: cur.x - 1, y: cur.y },
+                    { x: cur.x, y: cur.y + 1 },
+                    { x: cur.x, y: cur.y - 1 }
+                ];
+
+                for (const v of vecinos) {
+                    if (v.x < 0 || v.y < 0 || v.x >= columnas || v.y >= filas) continue;
+                    if (mapa[v.y][v.x] === 1) continue;
+                    const vh = h(v);
+                    if (visited.has(vh)) continue;
+                    visited.add(vh);
+                    parent.set(vh, h(cur));
+                    queue.push(v);
+                }
+            }
+            return null;
+        }
+
+        function lineaVision(enemigo, jugador, maxVision = 7) {
+            const dist = Math.abs(enemigo.x - jugador.x) + Math.abs(enemigo.y - jugador.y);
+            if (dist > maxVision) return false;
+            if (enemigo.x === jugador.x) {
+                const minY = Math.min(enemigo.y, jugador.y), maxY = Math.max(enemigo.y, jugador.y);
+                for (let y = minY + 1; y < maxY; y++) if (mapa[y][enemigo.x] === 1) return false;
+                return true;
+            }
+            if (enemigo.y === jugador.y) {
+                const minX = Math.min(enemigo.x, jugador.x), maxX = Math.max(enemigo.x, jugador.x);
+                for (let x = minX + 1; x < maxX; x++) if (mapa[enemigo.y][x] === 1) return false;
+                return true;
+            }
+            return false;
+        }
+
+        function generarEnemigos(num) {
+            enemigos = [];
+            for (let i = 0; i < num; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * columnas);
+                    y = Math.floor(Math.random() * filas);
+                } while (mapa[y][x] !== 0 || (x === 1 && y === 1) || (x === columnas - 2 && y === filas - 2));
+                enemigos.push({ x, y, state: 'idle', idleTarget: null, lastPos: null });
+            }
+        }
+
+        function vecinosLibres(x, y) {
+            const arr = [];
+            const cand = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+            for (const [dx, dy] of cand) {
+                const nx = x + dx, ny = y + dy;
+                if (nx >= 0 && ny >= 0 && nx < columnas && ny < filas && mapa[ny][nx] === 0) arr.push({ x: nx, y: ny });
+            }
+            return arr;
+        }
+
+        function randomAccessibleCell() {
+            for (let tries = 0; tries < 50; tries++) {
+                const rx = Math.floor(Math.random() * columnas);
+                const ry = Math.floor(Math.random() * filas);
+                if (mapa[ry][rx] === 0) return { x: rx, y: ry };
+            }
+            for (let y = 0; y < filas; y++)
+                for (let x = 0; x < columnas; x++)
+                    if (mapa[y][x] === 0) return { x, y };
+            return { x: 1, y: 1 };
+        }
+
+        function moverEnemigos() {
+            for (const e of enemigos.slice()) {
+                let moved = false;
+                if (lineaVision(e, jugador)) {
+                    const paso = bfsPrimerPasoLimitado({ x: e.x, y: e.y }, jugador, 10, 800);
+                    if (paso) { e.lastPos = { x: e.x, y: e.y }; e.x = paso.x; e.y = paso.y; moved = true; e.state = 'chase'; }
+                }
+                if (!moved) {
+                    if (!e.idleTarget || (e.idleTarget && e.x === e.idleTarget.x && e.y === e.idleTarget.y))
+                        e.idleTarget = randomAccessibleCell();
+                    const pasoIdle = bfsPrimerPasoLimitado({ x: e.x, y: e.y }, e.idleTarget, 12, 500);
+                    if (pasoIdle) {
+                        if (e.lastPos && pasoIdle.x === e.lastPos.x && pasoIdle.y === e.lastPos.y) {
+                            const opciones = vecinosLibres(e.x, e.y).filter(p => !(e.lastPos && p.x === e.lastPos.x && p.y === e.lastPos.y));
+                            if (opciones.length > 0) { const mv = opciones[Math.floor(Math.random() * opciones.length)]; e.lastPos = { x: e.x, y: e.y }; e.x = mv.x; e.y = mv.y; moved = true; }
+                            else { e.lastPos = { x: e.x, y: e.y }; e.x = pasoIdle.x; e.y = pasoIdle.y; moved = true; }
+                        } else { e.lastPos = { x: e.x, y: e.y }; e.x = pasoIdle.x; e.y = pasoIdle.y; moved = true; }
+                    } else {
+                        const opciones = vecinosLibres(e.x, e.y).filter(p => !(e.lastPos && p.x === e.lastPos.x && p.y === e.lastPos.y));
+                        if (opciones.length === 0) { const allOps = vecinosLibres(e.x, e.y); if (allOps.length > 0) { const mv = allOps[Math.floor(Math.random() * allOps.length)]; e.lastPos = { x: e.x, y: e.y }; e.x = mv.x; e.y = mv.y; moved = true; } }
+                        else { const mv = opciones[Math.floor(Math.random() * opciones.length)]; e.lastPos = { x: e.x, y: e.y }; e.x = mv.x; e.y = mv.y; moved = true; }
+                    }
+                    e.state = 'idle';
+                }
+
+                for (let i = trampas.length - 1; i >= 0; i--) {
+                    const t = trampas[i];
+                    if (e.x === t.x && e.y === t.y) {
+                        enemigos.splice(enemigos.indexOf(e), 1);
+                        trampas.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            verificarColision();
+            dibujarLaberinto();
+        }
+
+        function verificarColision() {
+            for (const e of enemigos)
+                if (e.x === jugador.x && e.y === jugador.y) { alert('💀 ¡Te atraparon!'); reiniciar(); }
+        }
+
+        function reiniciar() {
+            generarLaberinto();
+            jugador = { x: 1, y: 1 };
+            generarEnemigos(4);
+            trampas = [];
+            dibujarLaberinto();
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowUp') moverJugador(0, -1);
+            if (e.key === 'ArrowDown') moverJugador(0, 1);
+            if (e.key === 'ArrowLeft') moverJugador(-1, 0);
+            if (e.key === 'ArrowRight') moverJugador(1, 0);
+            if (e.code === 'Space') colocarTrampa();
+        });
+
+        generarLaberinto();
+        generarEnemigos(4);
+        dibujarLaberinto();
+        setInterval(moverEnemigos, 500);
+    </script>
+</body>
+
+</html>
