@@ -18,7 +18,7 @@
         const DWALL_HITS = 3;             // Golpes para romper un muro destructible
         const TRAP_HINTS = true;          // Mostrar indicios sutiles de trampas
         const TRAP_HINT_RADIUS = 2;       // Radio (Manhattan) para mostrar indicio cerca del jugador
-        const TIMER_DURATION = 20;       // 3 minutos en segundos (180)
+        const TIMER_DURATION = 90;       // 1 minuto y medio en segundos (90)
 
         // Utilidades básicas
         const inBounds = (r, c) => r >= 0 && c >= 0 && r < ROWS && c < COLS;
@@ -97,6 +97,7 @@
                 this.deathSfx = document.getElementById("death-sfx");
                 this.jumpscareSfx = document.getElementById("jumpscare-sfx");
                 this._consumedTurn = false;        // Marca si una acción sin movimiento consume turno
+                this.isFirstAttempt = true;       // Controlar si es el primer intento
                 this.aggroTurns = 0;               // Turnos de aggro global tras trampa
                 this.destructWalls = new Map();    // key -> golpesRestantes
                 this.traps = [];                   // {r,c,armed}
@@ -144,8 +145,8 @@
                 this.keysPressed.clear();
                 this.keyRepeatBlocked.clear();
 
-                // Reiniciar temporizador
-                this.timeLeft = TIMER_DURATION;
+                // Reiniciar temporizador con duración según el intento
+                this.timeLeft = this.isFirstAttempt ? TIMER_DURATION / 2 : TIMER_DURATION;
                 this.#stopTimer();
                 this.#startTimer();
                 this.#updateTimer();
@@ -889,6 +890,7 @@
                             // El jugador NO tiene puñal - MUERTE
                             console.log(`💀 MUERTE: Jugador desarmado es atrapado por monstruo en (${monster.r},${monster.c})`);
                             this.gameOver = true;
+                            this.isFirstAttempt = false; // Ya no es el primer intento
                             this.#stopTimer(); // Parar temporizador
                             // Reproducir sonido de muerte
                             this.#playDeathSfx();
@@ -1176,6 +1178,7 @@
             #onTimerExpired() {
                 this.#stopTimer();
                 this.gameOver = true;
+                this.isFirstAttempt = false; // Ya no es el primer intento
                 
                 // ¡JUMPSCARE CUANDO SE ACABA EL TIEMPO!
                 this.#showJumpscare();
