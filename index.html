@@ -128,10 +128,51 @@
                 filter: brightness(1.4);
             }
         }
+
+        /* 🔥 Pantalla de inicio */
+        #pantallaInicio {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #220033 0%, #000 90%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #ff9933;
+            text-align: center;
+            z-index: 9998;
+        }
+
+        #botonJugar {
+            font-family: 'Creepster', cursive;
+            font-size: 2rem;
+            background: linear-gradient(180deg, #ff6600, #cc3300);
+            color: #fff;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 12px;
+            box-shadow: 0 0 25px 8px rgba(255, 100, 0, 0.7);
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #botonJugar:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 40px 10px rgba(255, 160, 0, 1);
+        }
     </style>
 </head>
 
 <body>
+
+    <!-- 🔥 Pantalla de inicio -->
+    <div id="pantallaInicio">
+        <h1>🎃 Laberinto de Halloween 🎃</h1>
+        <button id="botonJugar">Jugar</button>
+    </div>
 
     <h1>🎃 Laberinto de Halloween Avanzado 🎃</h1>
     <div id="laberinto"></div>
@@ -151,7 +192,6 @@
         let tiempoRestante = 90;
         let intervaloTiempo;
 
-        // Generar laberinto perfecto
         function generarLaberinto(filas, columnas) {
             const mapa = Array.from({ length: filas }, () => Array(columnas).fill(1));
 
@@ -222,6 +262,7 @@
             laberinto.appendChild(meta);
 
             llaves.forEach((l) => {
+                if (!l) return;
                 const llave = document.createElement('div');
                 llave.className = 'llave';
                 llave.style.top = l.f * (32 + 2) + 10 + "px";
@@ -244,8 +285,6 @@
             mensaje.textContent = "👻 ¡Has escapado del laberinto embrujado! 🎃";
             jugador.style.boxShadow = "0 0 30px 12px #00ff99";
             clearInterval(intervaloTiempo);
-
-            // 🔗 Redirigir a otro archivo HTML después de un pequeño efecto
             setTimeout(() => {
                 window.location.href = "LABERINTO_JOHAN.html";
             }, 2000);
@@ -289,7 +328,6 @@
                 col = nuevaCol;
                 actualizarPosiciones();
 
-                // Comprobar si hay llave
                 llaves.forEach((l, i) => {
                     if (l && l.f === fila && l.c === col) {
                         llavesObtenidas++;
@@ -317,18 +355,17 @@
         dibujarLaberinto();
         actualizarPosiciones();
         colocarMeta();
-        // <-- NOTA: aquí **NO** llamamos a iniciarTemporizador() inmediatamente,
-        // lo dejamos para que el bloque de abajo (load) lo haga con la lógica de intentos.
     </script>
 
-    <!-- 🔥 BLOQUE AÑADIDO SIN CAMBIAR NADA DE TU CÓDIGO (solo gestión de intentos persistente) -->
+    <!-- Bloque de intentos -->
     <script>
-        // ✅ Bloque mejorado con localStorage (mantiene los intentos tras reiniciar)
         let intentos = parseInt(localStorage.getItem("intentos"), 10);
         if (isNaN(intentos)) intentos = 0;
 
-        window.addEventListener('load', () => {
-            // Aseguramos que no haya otro intervalo corriendo
+        function iniciarJuego() {
+            const pantallaInicio = document.getElementById("pantallaInicio");
+            pantallaInicio.style.display = "none";
+
             clearInterval(intervaloTiempo);
 
             if (intentos === 0) tiempoRestante = 30;
@@ -337,7 +374,9 @@
 
             contador.textContent = `Tiempo: ${tiempoRestante}s`;
             iniciarTemporizador();
-        });
+        }
+
+        document.getElementById("botonJugar").addEventListener("click", iniciarJuego);
 
         const oldJumpscare = activarJumpscare;
         activarJumpscare = function () {
