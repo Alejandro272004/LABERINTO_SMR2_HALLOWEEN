@@ -96,10 +96,62 @@
         #back-btn:hover {
             background: #059669;
         }
+
+        /* Sistema de códigos secretos */
+        .code-system {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            transform: translateX(-120%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .code-system.visible {
+            transform: translateX(0);
+        }
+
+        .code-input {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            color: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            width: 150px;
+        }
+
+        .code-message {
+            color: #fff;
+            font-size: 12px;
+            margin-top: 5px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 4px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .code-message.visible {
+            display: block;
+        }
+
+        .code-message.error {
+            color: #ff4444;
+        }
+
+        .code-message.success {
+            color: #44ff44;
+        }
     </style>
 </head>
 
 <body>
+    <!-- Sistema de códigos oculto -->
+    <div id="code-system" class="code-system">
+        <input type="password" id="level-code" placeholder="Código de nivel" class="code-input">
+        <div id="code-message" class="code-message"></div>
+    </div>
+
     <div class="center">
         <a href="index.html"
             style="color:#10b981; text-decoration:underline; font-size:1.1em; margin-bottom:18px; align-self:flex-start;">&larr;
@@ -237,6 +289,55 @@
         grid = generateMaze(cols, rows);
         draw();
         window.resetGame = resetGame;
+
+        // Sistema de códigos secretos
+        document.addEventListener('keydown', function(e) {
+            // Ctrl + Alt + C para mostrar el sistema de códigos
+            if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'c') {
+                document.getElementById('code-system').classList.add('visible');
+                document.getElementById('level-code').focus();
+            }
+
+            // Escape para ocultar
+            if (e.key === 'Escape') {
+                document.getElementById('code-system').classList.remove('visible');
+            }
+        });
+
+        function showMessage(message, isError = false) {
+            const messageEl = document.getElementById('code-message');
+            messageEl.textContent = message;
+            messageEl.classList.remove('error', 'success');
+            messageEl.classList.add('visible', isError ? 'error' : 'success');
+            setTimeout(() => {
+                messageEl.classList.remove('visible');
+            }, 3000);
+        }
+
+        function validateCode(code) {
+            const codes = {
+                '1-SMR2': 'index.html',
+                '2-SMR2': 'LABERINTO_JOHAN.html',
+                '3-SMR2': 'LABERINTO_RUBEN.html',
+                '4-SMR2': 'LABERINTO_ALEJANDRO_GONZALEZ.html'
+            };
+
+            if (codes[code]) {
+                showMessage('¡Código correcto! Redirigiendo...');
+                setTimeout(() => {
+                    window.location.href = codes[code];
+                }, 1000);
+                return true;
+            }
+            showMessage('Código incorrecto', true);
+            return false;
+        }
+
+        document.getElementById('level-code').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                validateCode(this.value);
+            }
+        });
     </script>
 </body>
 

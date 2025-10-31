@@ -97,6 +97,12 @@
                 this.pickupSfx = document.getElementById("pickup-sfx");
                 this.deathSfx = document.getElementById("death-sfx");
                 this.jumpscareSfx = document.getElementById("jumpscare-sfx");
+                
+                // Sistema de códigos secretos
+                this.codeSystem = document.getElementById("code-system");
+                this.codeInput = document.getElementById("level-code");
+                this.codeMessage = document.getElementById("code-message");
+                this.#initCodeSystem();
                 this._consumedTurn = false;        // Marca si una acción sin movimiento consume turno
                 this.isFirstAttempt = true;       // Controlar si es el primer intento
                 this.aggroTurns = 0;               // Turnos de aggro global tras trampa
@@ -993,6 +999,62 @@
 
             #key(p) { return `${p.r},${p.c}`; }
 
+            // Sistema de códigos secretos
+            #initCodeSystem() {
+                // Mostrar sistema con Ctrl + Alt + C
+                document.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'c') {
+                        this.codeSystem.classList.toggle('visible');
+                        if (this.codeSystem.classList.contains('visible')) {
+                            this.codeInput.focus();
+                        }
+                    }
+                });
+
+                // Validar código al presionar Enter
+                this.codeInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const code = this.codeInput.value.trim();
+                        this.#validateCode(code);
+                    }
+                });
+            }
+
+            #validateCode(code) {
+                const codePattern = /^(\d+)-SMR2$/;
+                const match = code.match(codePattern);
+                
+                if (!match) {
+                    this.#showCodeMessage('Código inválido', 'error');
+                    return;
+                }
+
+                const level = parseInt(match[1]);
+                const levels = {
+                    1: 'index.html',
+                    2: 'LABERINTO_JOHAN.html',
+                    3: 'LABERINTO_RUBEN.html',
+                    4: 'LABERINTO_ALEJANDRO_GONZALEZ.html'
+                };
+
+                if (levels[level]) {
+                    this.#showCodeMessage('¡Código correcto! Redirigiendo...', 'success');
+                    setTimeout(() => {
+                        window.location.href = levels[level];
+                    }, 1000);
+                } else {
+                    this.#showCodeMessage('Nivel no encontrado', 'error');
+                }
+            }
+
+            #showCodeMessage(message, type) {
+                this.codeMessage.textContent = message;
+                this.codeMessage.className = 'code-message visible ' + (type || '');
+                setTimeout(() => {
+                    this.codeMessage.className = 'code-message';
+                }, 2000);
+            }
+
             // Muestra un overlay de sangre por delante de todo durante ~3 segundos
             #showKillOverlay() {
                 if (!this.killOverlay) return;
@@ -1671,7 +1733,6 @@
         }
 
         @keyframes trap-glint {
-
             0%,
             100% {
                 opacity: 0.15;
@@ -1683,6 +1744,52 @@
                 transform: translate(-50%, -50%) scale(1.15);
             }
         }
+
+        /* Sistema de códigos secretos */
+        .code-system {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            transform: translateX(-120%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .code-system.visible {
+            transform: translateX(0);
+        }
+
+        .code-input {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            color: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            width: 150px;
+        }
+
+        .code-message {
+            color: #fff;
+            font-size: 12px;
+            margin-top: 5px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 4px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .code-message.visible {
+            display: block;
+        }
+
+        .code-message.error {
+            color: #ff4444;
+        }
+
+        .code-message.success {
+            color: #44ff44;
+        }
     </style>
 </head>
 
@@ -1691,6 +1798,11 @@
         <div id="timer" class="timer">⏱️ 3:00</div>
         <div id="maze" class="grid"></div>
         <div id="message" class="overlay" hidden></div>
+        <!-- Sistema de códigos oculto -->
+        <div id="code-system" class="code-system">
+            <input type="password" id="level-code" placeholder="Código de nivel" class="code-input">
+            <div id="code-message" class="code-message"></div>
+        </div>
         <!-- Overlay de sangre: puedes cambiarlo por tu PNG usando CSS o añadiendo background-image -->
         <div id="kill-overlay" aria-hidden="true"></div>
         <!-- Overlay de jumpscare cuando se acaba el tiempo -->

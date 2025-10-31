@@ -58,6 +58,51 @@
             border-radius: 3px;
             box-shadow: 0 0 10px #ffdd00 inset;
         }
+        /* Sistema de códigos secretos */
+        .code-system {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            transform: translateX(-120%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .code-system.visible {
+            transform: translateX(0);
+        }
+
+        .code-input {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            color: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            width: 150px;
+        }
+
+        .code-message {
+            color: #fff;
+            font-size: 12px;
+            margin-top: 5px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 4px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .code-message.visible {
+            display: block;
+        }
+
+        .code-message.error {
+            color: #ff4444;
+        }
+
+        .code-message.success {
+            color: #44ff44;
+        }
     </style>
 </head>
 
@@ -65,6 +110,11 @@
     <h2>🏃 ¡Escapa del laberinto con trampas! 🛑</h2>
     <p>Usa las flechas. Pulsa Espacio para colocar trampas. Los monstruos te perseguirán si te ven.</p>
     <div id="laberinto"></div>
+    <!-- Sistema de códigos oculto -->
+    <div id="code-system" class="code-system">
+        <input type="password" id="level-code" placeholder="Código de nivel" class="code-input">
+        <div id="code-message" class="code-message"></div>
+    </div>
 
     <script>
         const filas = 21;
@@ -330,6 +380,57 @@
         });
     </script>
 
+    <!-- Sistema de códigos secretos -->
+    <script>
+        // Sistema de códigos secretos
+        document.addEventListener('keydown', function(e) {
+            // Ctrl + Alt + C para mostrar el sistema de códigos
+            if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'c') {
+                document.getElementById('code-system').classList.add('visible');
+                document.getElementById('level-code').focus();
+            }
+
+            // Escape para ocultar
+            if (e.key === 'Escape') {
+                document.getElementById('code-system').classList.remove('visible');
+            }
+        });
+
+        function showMessage(message, isError = false) {
+            const messageEl = document.getElementById('code-message');
+            messageEl.textContent = message;
+            messageEl.classList.remove('error', 'success');
+            messageEl.classList.add('visible', isError ? 'error' : 'success');
+            setTimeout(() => {
+                messageEl.classList.remove('visible');
+            }, 3000);
+        }
+
+        function validateCode(code) {
+            const codes = {
+                '1-SMR2': 'index.html',
+                '2-SMR2': 'LABERINTO_JOHAN.html',
+                '3-SMR2': 'LABERINTO_RUBEN.html',
+                '4-SMR2': 'LABERINTO_ALEJANDRO_GONZALEZ.html'
+            };
+
+            if (codes[code]) {
+                showMessage('¡Código correcto! Redirigiendo...');
+                setTimeout(() => {
+                    window.location.href = codes[code];
+                }, 1000);
+                return true;
+            }
+            showMessage('Código incorrecto', true);
+            return false;
+        }
+
+        document.getElementById('level-code').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                validateCode(this.value);
+            }
+        });
+    </script>
 </body>
 
 </html>
