@@ -1010,9 +1010,13 @@
                     bottom: 0;
                     width: 20px;
                     height: 20px;
-                    opacity: 0;
-                    cursor: default;
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 4px;
+                    opacity: 0.15;
+                    cursor: pointer;
                     z-index: 1000;
+                    transition: opacity 0.3s ease;
                 `;
                 document.body.appendChild(button);
 

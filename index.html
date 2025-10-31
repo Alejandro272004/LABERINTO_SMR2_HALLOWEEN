@@ -444,14 +444,33 @@
     <!-- Sistema de códigos secretos -->
     <script>
         // Sistema de códigos secretos
-        document.addEventListener('keydown', function(e) {
-            // Ctrl + Alt + C para mostrar el sistema de códigos
-            if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'c') {
-                document.getElementById('code-system').classList.add('visible');
-                document.getElementById('level-code').focus();
-            }
+        // Crear botón ligeramente visible
+        const button = document.createElement('button');
+        button.id = 'code-button';
+        button.style.cssText = `
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            opacity: 0.15;
+            cursor: pointer;
+            z-index: 1000;
+            transition: opacity 0.3s ease;
+        `;
+        document.body.appendChild(button);
 
-            // Escape para ocultar
+        // Mostrar sistema al hacer click en el botón
+        button.addEventListener('click', () => {
+            document.getElementById('code-system').classList.add('visible');
+            document.getElementById('level-code').focus();
+        });
+
+        // Escape para ocultar
+        document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 document.getElementById('code-system').classList.remove('visible');
             }
