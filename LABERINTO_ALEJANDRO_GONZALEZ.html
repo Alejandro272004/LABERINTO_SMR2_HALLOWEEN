@@ -111,6 +111,23 @@
             transform: translateX(0);
         }
 
+        #code-button {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            width: 20px;
+            height: 20px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            z-index: 1000;
+            opacity: 0.2;
+        }
+
+        #code-button:hover {
+            opacity: 0.5;
+        }
+
         .code-input {
             background: rgba(0, 0, 0, 0.8);
             border: 1px solid #333;
@@ -151,6 +168,7 @@
         <input type="password" id="level-code" placeholder="Código de nivel" class="code-input">
         <div id="code-message" class="code-message"></div>
     </div>
+    <button id="code-button" title="Códigos">⚡</button>
 
     <div class="center">
         <a href="index.html"
@@ -283,7 +301,18 @@
             }
         }
 
-        document.addEventListener('keydown', handleKey);
+        // Manejar los movimientos del jugador
+        document.addEventListener('keydown', function(e) {
+            // Si el sistema de códigos está visible o estamos escribiendo, no procesar movimientos
+            if (document.getElementById('code-system').classList.contains('visible') || 
+                e.target.tagName.toLowerCase() === 'input') {
+                if (e.key === 'Escape') {
+                    document.getElementById('code-system').classList.remove('visible');
+                }
+                return;
+            }
+            handleKey(e);
+        });
 
         // Inicializar
         grid = generateMaze(cols, rows);
@@ -291,16 +320,20 @@
         window.resetGame = resetGame;
 
         // Sistema de códigos secretos
-        document.addEventListener('keydown', function(e) {
-            // Ctrl + Alt + C para mostrar el sistema de códigos
-            if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'c') {
-                document.getElementById('code-system').classList.add('visible');
-                document.getElementById('level-code').focus();
-            }
+        const codeButton = document.getElementById('code-button');
+        const codeSystem = document.getElementById('code-system');
+        const levelCode = document.getElementById('level-code');
 
-            // Escape para ocultar
+        // Botón para mostrar sistema de códigos
+        codeButton.addEventListener('click', function() {
+            codeSystem.classList.add('visible');
+            levelCode.focus();
+        });
+
+        // Escape para ocultar
+        document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                document.getElementById('code-system').classList.remove('visible');
+                codeSystem.classList.remove('visible');
             }
         });
 

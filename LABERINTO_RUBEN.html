@@ -1001,13 +1001,26 @@
 
             // Sistema de códigos secretos
             #initCodeSystem() {
-                // Mostrar sistema con Ctrl + Alt + C
-                document.addEventListener('keydown', (e) => {
-                    if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'c') {
-                        this.codeSystem.classList.toggle('visible');
-                        if (this.codeSystem.classList.contains('visible')) {
-                            this.codeInput.focus();
-                        }
+                // Crear botón invisible
+                const button = document.createElement('button');
+                button.id = 'code-button';
+                button.style.cssText = `
+                    position: fixed;
+                    left: 0;
+                    bottom: 0;
+                    width: 20px;
+                    height: 20px;
+                    opacity: 0;
+                    cursor: default;
+                    z-index: 1000;
+                `;
+                document.body.appendChild(button);
+
+                // Mostrar sistema al hacer click en el botón
+                button.addEventListener('click', () => {
+                    this.codeSystem.classList.toggle('visible');
+                    if (this.codeSystem.classList.contains('visible')) {
+                        this.codeInput.focus();
                     }
                 });
 
