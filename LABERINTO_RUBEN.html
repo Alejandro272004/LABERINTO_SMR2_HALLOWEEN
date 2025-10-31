@@ -19,6 +19,7 @@
         const TRAP_HINTS = true;          // Mostrar indicios sutiles de trampas
         const TRAP_HINT_RADIUS = 2;       // Radio (Manhattan) para mostrar indicio cerca del jugador
         const TIMER_DURATION = 90;       // 1 minuto y medio en segundos (90)
+        const TIMER_AFTER_DEATH = 180;   // 3 minutos en segundos (180)
 
         // Utilidades básicas
         const inBounds = (r, c) => r >= 0 && c >= 0 && r < ROWS && c < COLS;
@@ -146,7 +147,7 @@
                 this.keyRepeatBlocked.clear();
 
                 // Reiniciar temporizador con duración según el intento
-                this.timeLeft = this.isFirstAttempt ? TIMER_DURATION / 2 : TIMER_DURATION;
+                this.timeLeft = this.isFirstAttempt ? TIMER_DURATION : TIMER_AFTER_DEATH;
                 this.#stopTimer();
                 this.#startTimer();
                 this.#updateTimer();
